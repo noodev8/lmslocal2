@@ -123,10 +123,10 @@ const sendPasswordResetEmail = async (email, token, displayName) => {
               <p style="color: #666; margin: 5px 0 0 0;">Last Man Standing Competitions</p>
             </div>
             
-            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 30px; border-radius: 10px; text-align: center;">
-              <h2 style="color: #92400e; margin-top: 0;">Reset Your Password</h2>
-              <p style="color: #78350f; margin-bottom: 25px;">Hi ${displayName},</p>
-              <p style="color: #78350f; margin-bottom: 25px;">
+            <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); padding: 30px; border-radius: 10px; text-align: center;">
+              <h2 style="color: #1f2937; margin-top: 0;">Reset Your Password</h2>
+              <p style="color: #4b5563; margin-bottom: 25px;">Hi ${displayName},</p>
+              <p style="color: #4b5563; margin-bottom: 25px;">
                 You requested a password reset for your LMS Local account. Click the button below to create a new password.
               </p>
               
@@ -135,11 +135,11 @@ const sendPasswordResetEmail = async (email, token, displayName) => {
                 Reset Password
               </a>
               
-              <p style="color: #a16207; font-size: 14px; margin-top: 25px;">
+              <p style="color: #6b7280; font-size: 14px; margin-top: 25px;">
                 This reset link will expire in 1 hour for security.
               </p>
               
-              <p style="color: #a16207; font-size: 12px; margin-top: 20px;">
+              <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">
                 If you didn't request a password reset, you can safely ignore this email.
               </p>
             </div>

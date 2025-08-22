@@ -870,7 +870,7 @@ router.get('/reset-password', async (req, res) => {
           <style>
             body { 
               font-family: Arial, sans-serif; 
-              background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
+              background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); 
               margin: 0; 
               padding: 20px; 
               min-height: 100vh;
@@ -884,7 +884,7 @@ router.get('/reset-password', async (req, res) => {
               box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             }
             h1 { color: #2563eb; text-align: center; margin-bottom: 10px; }
-            h2 { color: #92400e; text-align: center; margin-bottom: 20px; }
+            h2 { color: #1f2937; text-align: center; margin-bottom: 20px; }
             .form-group { margin-bottom: 20px; }
             label { display: block; margin-bottom: 8px; font-weight: bold; color: #374151; }
             input[type="password"] { 
@@ -1004,10 +1004,9 @@ router.get('/reset-password', async (req, res) => {
                 const data = await response.json();
                 
                 if (data.return_code === 'SUCCESS') {
-                  messageDiv.innerHTML = '<div class="success">Password reset successfully! Redirecting to login...</div>';
-                  setTimeout(() => {
-                    window.location.href = 'http://localhost:3000/login';
-                  }, 2000);
+                  messageDiv.innerHTML = '<div class="success">Password reset successfully! You can now login with your new password.<br><br><a href="http://localhost:3000/login" class="button" style="display: inline-block; text-decoration: none; margin-top: 10px;">Go to Login</a></div>';
+                  // Hide the form
+                  document.getElementById('resetForm').style.display = 'none';
                 } else {
                   messageDiv.innerHTML = '<div class="error">' + (data.message || 'Failed to reset password') + '</div>';
                   // Reset button state
