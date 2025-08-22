@@ -1,5 +1,6 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
@@ -19,7 +20,7 @@ const ProtectedRoute = ({ children }) => {
     )
   }
   
-  return user ? children : <Navigate to="/login" />
+  return user ? children : <Navigate to="/" />
 }
 
 // Public Route Component (redirect if already logged in)
@@ -41,9 +42,9 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen">
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" />} />
+            <Route path="/" element={<Landing />} />
             <Route 
               path="/login" 
               element={
@@ -84,7 +85,7 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route path="*" element={<Navigate to="/dashboard" />} />
+            <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>
       </Router>
