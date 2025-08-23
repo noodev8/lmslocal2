@@ -869,6 +869,35 @@ router.post('/:id/rounds/:roundId/fixtures', async (req, res) => {
 
     const teams = teamVerify.rows[0];
 
+    // Check if fixture kickoff is before round lock time
+    const roundLockCheck = await pool.query(`
+      SELECT lock_time FROM round WHERE id = $1
+    `, [round_id]);
+
+    let warning = null;
+    if (roundLockCheck.rows.length > 0) {
+      const lockTime = new Date(roundLockCheck.rows[0].lock_time);
+      const fixtureKickoff = new Date(kickoff_time);
+      
+      if (fixtureKickoff < lockTime) {
+        const formattedKickoff = fixtureKickoff.toLocaleDateString('en-GB', {
+          weekday: 'short',
+          day: '2-digit', 
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        const formattedLockTime = lockTime.toLocaleDateString('en-GB', {
+          weekday: 'short',
+          day: '2-digit', 
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        warning = `Warning: Fixture kicks off at ${formattedKickoff} but round locks at ${formattedLockTime}.`;
+      }
+    }
+
     // Create the fixture (using current schema with varchar team names)
     const result = await pool.query(`
       INSERT INTO fixture (
@@ -896,11 +925,17 @@ router.post('/:id/rounds/:roundId/fixtures', async (req, res) => {
       `Added fixture ${teamVerify.rows[0].home_name} vs ${teamVerify.rows[0].away_name} to Round ${verifyResult.rows[0].round_number}`
     ]);
 
-    res.json({
+    const response = {
       return_code: "SUCCESS",
       message: "Fixture added successfully",
       fixture: fixture
-    });
+    };
+
+    if (warning) {
+      response.warning = warning;
+    }
+
+    res.json(response);
 
   } catch (error) {
     console.error('Create fixture error:', error);
@@ -973,6 +1008,31 @@ router.put('/:id/rounds/:roundId', async (req, res) => {
       });
     }
 
+    // Check for fixtures that would be affected by lock time change
+    const fixturesCheck = await pool.query(`
+      SELECT COUNT(*) as fixture_count,
+             MIN(kickoff_time) as earliest_kickoff
+      FROM fixture
+      WHERE round_id = $1 AND kickoff_time < $2
+    `, [round_id, lock_time]);
+
+    let warning = null;
+    if (parseInt(fixturesCheck.rows[0].fixture_count) > 0) {
+      const earliestKickoff = new Date(fixturesCheck.rows[0].earliest_kickoff);
+      const newLockTime = new Date(lock_time);
+      
+      if (newLockTime > earliestKickoff) {
+        const formattedKickoff = earliestKickoff.toLocaleDateString('en-GB', {
+          weekday: 'short',
+          day: '2-digit', 
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        warning = `Warning: ${fixturesCheck.rows[0].fixture_count} fixture(s) kick off before the new lock time. The earliest fixture is at ${formattedKickoff}.`;
+      }
+    }
+
     // Update the round
     const result = await pool.query(`
       UPDATE round 
@@ -993,7 +1053,7 @@ router.put('/:id/rounds/:roundId', async (req, res) => {
       `Updated Round ${round.round_number} lock time from ${new Date(round.old_lock_time).toISOString()} to ${lock_time}`
     ]);
 
-    res.json({
+    const response = {
       return_code: "SUCCESS",
       message: "Round updated successfully",
       round: {
@@ -1002,7 +1062,13 @@ router.put('/:id/rounds/:roundId', async (req, res) => {
         lock_time: updatedRound.lock_time,
         created_at: updatedRound.created_at
       }
-    });
+    };
+
+    if (warning) {
+      response.warning = warning;
+    }
+
+    res.json(response);
 
   } catch (error) {
     console.error('Update round error:', error);

@@ -20,6 +20,7 @@ const ManageFixtures = () => {
     lock_time: ''
   })
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
   const [formData, setFormData] = useState({
     home_team_id: '',
     away_team_id: '',
@@ -86,6 +87,7 @@ const ManageFixtures = () => {
   const handleCreateFixture = async (e) => {
     e.preventDefault()
     setError('')
+    setWarning('')
     
     if (!formData.home_team_id || !formData.away_team_id || !formData.kickoff_time) {
       setError('Home team, away team, and kickoff time are required')
@@ -102,6 +104,12 @@ const ManageFixtures = () => {
       const response = await axios.post(`/competitions/${competitionId}/rounds/${roundId}/fixtures`, formData)
 
       if (response.data.return_code === 'SUCCESS') {
+        // Show warning if present
+        if (response.data.warning) {
+          setWarning(response.data.warning)
+          setTimeout(() => setWarning(''), 8000) // Clear after 8 seconds
+        }
+        
         // Refresh fixtures to get the new fixture with team names
         const fixturesResponse = await axios.get(`/competitions/${competitionId}/rounds/${roundId}/fixtures`)
         if (fixturesResponse.data.return_code === 'SUCCESS') {
@@ -164,6 +172,7 @@ const ManageFixtures = () => {
   const handleUpdateRound = async (e) => {
     e.preventDefault()
     setError('')
+    setWarning('')
     
     if (!editRoundData.lock_time) {
       setError('Lock time is required')
@@ -177,6 +186,12 @@ const ManageFixtures = () => {
       })
 
       if (response.data.return_code === 'SUCCESS') {
+        // Show warning if present
+        if (response.data.warning) {
+          setWarning(response.data.warning)
+          setTimeout(() => setWarning(''), 8000) // Clear after 8 seconds
+        }
+        
         // Update the round state
         setRound({
           ...round,
@@ -334,6 +349,18 @@ const ManageFixtures = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.962-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
               <p className="text-red-700 font-medium">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Warning Message */}
+        {warning && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-yellow-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.962-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <p className="text-yellow-700 font-medium">{warning}</p>
             </div>
           </div>
         )}
