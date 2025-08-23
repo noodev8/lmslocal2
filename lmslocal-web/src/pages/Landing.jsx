@@ -35,7 +35,7 @@ const Landing = () => {
                 <span className="text-primary-600 block">Effortlessly</span>
               </h1>
               <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                The admin-first platform for pub landlords, workplace organizers, and club managers. 
+                The admin-first platform for pub landlords, workplace organisers, and club managers. 
                 Set up competitions in 5 minutes, manage all players, and handle the complexity behind the scenes.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
@@ -366,7 +366,7 @@ const Landing = () => {
                   £19
                   <span className="text-lg text-gray-500 font-normal">/month</span>
                 </div>
-                <p className="text-gray-600 mb-6">For regular organizers</p>
+                <p className="text-gray-600 mb-6">For regular organisers</p>
                 
                 <div className="space-y-3 mb-8">
                   <div className="flex items-center">
@@ -415,7 +415,7 @@ const Landing = () => {
             Ready to Get Started?
           </h2>
           <p className="text-xl text-primary-100 mb-8">
-            Join hundreds of pub landlords and organizers running successful competitions
+            Join hundreds of pub landlords and organisers running successful competitions
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/register" className="bg-white text-primary-600 font-bold py-4 px-8 rounded-xl hover:bg-gray-50 transition-colors">
@@ -436,7 +436,7 @@ const Landing = () => {
               <h3 className="text-2xl font-bold mb-4">LMS Local</h3>
               <p className="text-gray-400 mb-4">
                 The admin-first platform for running Last Man Standing competitions. 
-                Built for pub landlords, workplace organizers, and club managers.
+                Built for pub landlords, workplace organisers, and club managers.
               </p>
             </div>
             

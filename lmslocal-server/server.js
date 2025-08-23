@@ -17,6 +17,7 @@ const rateLimit = require('express-rate-limit');
 // Import routes
 const healthRoute = require('./routes/health');
 const authRoute = require('./routes/auth');
+const competitionRoute = require('./routes/competition');
 
 const app = express();
 const PORT = process.env.PORT || 3015;
@@ -52,7 +53,9 @@ app.use(limiter);
 // CORS configuration
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Body parser middleware
@@ -68,6 +71,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/health', healthRoute);
 app.use('/auth', authRoute);
+app.use('/competitions', competitionRoute);
 
 // Default route for testing
 app.get('/', (req, res) => {

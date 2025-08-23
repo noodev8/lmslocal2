@@ -1,12 +1,85 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import axios from 'axios'
 
 const Dashboard = () => {
   const { user, logout } = useAuth()
+  const location = useLocation()
+  const [competitions, setCompetitions] = useState([])
+  const [competitionsLoading, setCompetitionsLoading] = useState(true)
+  const [successMessage, setSuccessMessage] = useState('')
+
+  // Handle success message from create competition
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message)
+      // Clear the message after a delay
+      setTimeout(() => setSuccessMessage(''), 5000)
+      // Clear navigation state
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
+
+  // Load user's competitions
+  useEffect(() => {
+    const loadCompetitions = async () => {
+      try {
+        const response = await axios.get('/competitions/my-competitions')
+        if (response.data.return_code === 'SUCCESS') {
+          setCompetitions(response.data.competitions)
+        }
+      } catch (error) {
+        console.error('Failed to load competitions:', error)
+      } finally {
+        setCompetitionsLoading(false)
+      }
+    }
+
+    loadCompetitions()
+  }, [])
 
   const handleLogout = () => {
     logout()
+  }
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'draft': return 'bg-gray-100 text-gray-800'
+      case 'active': return 'bg-green-100 text-green-800'
+      case 'completed': return 'bg-blue-100 text-blue-800'
+      case 'paused': return 'bg-yellow-100 text-yellow-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'draft': 
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+        )
+      case 'active':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H15M9 10V9a3 3 0 013-3m0 0a3 3 0 013 3v1M12 6V3" />
+          </svg>
+        )
+      case 'completed':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+      default:
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+    }
   }
 
   return (
@@ -52,106 +125,173 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Success Message */}
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl shadow-lg">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-green-700 font-medium">{successMessage}</p>
+            </div>
+          </div>
+        )}
+
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h2>
           <p className="text-gray-600">Manage your Last Man Standing competitions</p>
         </div>
 
-        {/* Main CTAs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           {/* Create Competition Card */}
-          <div className="group relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary-600 to-purple-600 rounded-2xl opacity-75 blur-sm group-hover:opacity-100 group-hover:blur-none transition-all duration-300"></div>
-            <button className="relative bg-white/90 backdrop-blur-md border border-white/20 hover:bg-white/95 text-gray-900 font-bold py-8 px-8 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform group-hover:-translate-y-2 group-hover:scale-105 w-full">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-purple-600 rounded-xl flex items-center justify-center transform group-hover:rotate-12 transition-transform duration-300">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </div>
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Create Competition</h3>
-                  <p className="text-gray-600">Start a new Last Man Standing competition in minutes</p>
-                </div>
-                <div className="flex items-center text-primary-600 font-medium">
-                  <span>Get Started</span>
-                  <svg className="w-5 h-5 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </div>
+          <Link to="/create-competition" className="group bg-white/90 backdrop-blur-md border border-white/20 hover:border-primary-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 p-6 block">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
               </div>
-            </button>
-          </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Create Competition</h3>
+                <p className="text-sm text-gray-600">Start a new Last Man Standing competition</p>
+              </div>
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </Link>
 
           {/* Join Competition Card */}
-          <div className="group relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-teal-600 rounded-2xl opacity-75 blur-sm group-hover:opacity-100 group-hover:blur-none transition-all duration-300"></div>
-            <button className="relative bg-white/90 backdrop-blur-md border border-white/20 hover:bg-white/95 text-gray-900 font-bold py-8 px-8 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform group-hover:-translate-y-2 group-hover:scale-105 w-full">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl flex items-center justify-center transform group-hover:rotate-12 transition-transform duration-300">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M8 6v10a2 2 0 002 2h4a2 2 0 002-2V6" />
-                  </svg>
-                </div>
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Join Competition</h3>
-                  <p className="text-gray-600">Enter an existing competition with your invite code</p>
-                </div>
-                <div className="flex items-center text-green-600 font-medium">
-                  <span>Join Now</span>
-                  <svg className="w-5 h-5 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </div>
+          <Link to="/join-competition" className="group bg-white/90 backdrop-blur-md border border-white/20 hover:border-green-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 p-6 block">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M8 6v10a2 2 0 002 2h4a2 2 0 002-2V6" />
+                </svg>
               </div>
-            </button>
-          </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Join Competition</h3>
+                <p className="text-sm text-gray-600">Enter with your invite code</p>
+              </div>
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-green-600 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </Link>
         </div>
 
         {/* Current Competitions */}
         <div className="bg-white/90 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl p-8 mb-12">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-1">Current Competitions</h3>
-              <p className="text-gray-600">Manage and track your active competitions</p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-1">Your Competitions</h3>
+              <p className="text-gray-600">Manage and track your competitions</p>
             </div>
             <div className="bg-gradient-to-r from-blue-100 to-purple-100 px-4 py-2 rounded-full">
-              <span className="text-sm font-medium text-gray-700">0 active</span>
+              <span className="text-sm font-medium text-gray-700">
+                {competitionsLoading ? 'Loading...' : `${competitions.length} total`}
+              </span>
             </div>
           </div>
           
-          {/* Competition List - Placeholder */}
+          {/* Competition List */}
           <div className="space-y-4">
-            {/* Empty State */}
-            <div className="text-center py-16">
-              <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-              </div>
-              <h4 className="text-xl font-semibold text-gray-900 mb-3">No Competitions Yet</h4>
-              <p className="text-gray-600 mb-6 max-w-md mx-auto">Ready to get started? Create your first competition and watch the excitement unfold!</p>
-              <button className="bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white font-medium px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
-                Create Competition
-              </button>
-            </div>
-
-            {/* Placeholder Competition Cards - will be dynamically populated later */}
-            {/* 
-            <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
-              <div className="flex justify-between items-start mb-2">
-                <h4 className="text-lg font-medium text-gray-900">Premier League 2025 LMS</h4>
-                <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>
-              </div>
-              <p className="text-gray-600 text-sm mb-3">Round 5 of 38 • 24 players remaining</p>
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-500">
-                  Next deadline: Tomorrow 2:00 PM
+            {competitionsLoading ? (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
                 </div>
-                <button className="text-primary-600 hover:text-primary-700 font-medium text-sm">Manage →</button>
+                <h4 className="text-xl font-semibold text-gray-900 mb-3">Loading Competitions...</h4>
               </div>
-            </div>
-            */}
+            ) : competitions.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </div>
+                <h4 className="text-xl font-semibold text-gray-900 mb-3">No Competitions Yet</h4>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">Ready to get started? Create your first competition and watch the excitement unfold!</p>
+                <Link to="/create-competition" className="bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white font-medium px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 inline-block">
+                  Create Competition
+                </Link>
+              </div>
+            ) : (
+              competitions.map((competition) => (
+                <div key={competition.id} className="bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl p-6 hover:bg-white/90 hover:shadow-lg transition-all duration-200">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-1">{competition.name}</h4>
+                      {competition.description && (
+                        <p className="text-gray-600 text-sm mb-2">{competition.description}</p>
+                      )}
+                      <p className="text-gray-500 text-sm">Using {competition.team_list_name}</p>
+                    </div>
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full flex items-center space-x-1 ${getStatusColor(competition.status)}`}>
+                      {getStatusIcon(competition.status)}
+                      <span className="capitalize">{competition.status}</span>
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
+                    <div className="flex items-center space-x-4">
+                      <span>{competition.player_count} players</span>
+                      <span>•</span>
+                      <span>{competition.lives_per_player} {competition.lives_per_player === 1 ? 'life' : 'lives'} per player</span>
+                      {competition.no_team_twice && (
+                        <>
+                          <span>•</span>
+                          <span>No team twice rule</span>
+                        </>
+                      )}
+                    </div>
+                    <span>Created {new Date(competition.created_at).toLocaleDateString()}</span>
+                  </div>
+                  
+                  {/* Invite Code Section */}
+                  <div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg p-3 mb-4 border border-primary-200/50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-medium text-primary-700 block mb-1">Invite Code</span>
+                        <span className="text-sm font-mono font-bold text-primary-800">{competition.invite_code}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(competition.invite_code)
+                          // Could add a toast notification here
+                        }}
+                        className="px-2 py-1 text-xs bg-white hover:bg-gray-50 text-primary-700 rounded-md border border-primary-200 hover:border-primary-300 transition-all flex items-center space-x-1"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copy</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                      {competition.status === 'draft' && (
+                        <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full border border-orange-200">
+                          Ready to configure and launch
+                        </span>
+                      )}
+                    </div>
+                    <Link
+                      to={`/competitions/${competition.id}/rounds`}
+                      className="text-primary-600 hover:text-primary-700 font-medium text-sm flex items-center space-x-1 hover:space-x-2 transition-all"
+                    >
+                      <span>Manage Rounds</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2V7z" />
+                      </svg>
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

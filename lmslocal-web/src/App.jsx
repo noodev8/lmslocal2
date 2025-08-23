@@ -6,6 +6,10 @@ import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
+import CreateCompetition from './pages/CreateCompetition'
+import JoinCompetition from './pages/JoinCompetition'
+import ManageRounds from './pages/ManageRounds'
+import ManageFixtures from './pages/ManageFixtures'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 // Protected Route Component
@@ -82,6 +86,38 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/create-competition" 
+              element={
+                <ProtectedRoute>
+                  <CreateCompetition />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/join-competition" 
+              element={
+                <ProtectedRoute>
+                  <JoinCompetition />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/competitions/:competitionId/rounds" 
+              element={
+                <ProtectedRoute>
+                  <ManageRounds />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/competitions/:competitionId/rounds/:roundId/fixtures" 
+              element={
+                <ProtectedRoute>
+                  <ManageFixtures />
                 </ProtectedRoute>
               } 
             />
