@@ -8,6 +8,7 @@ Purpose: Handle competition creation, retrieval, and management
 
 const express = require('express');
 const { Pool } = require('pg');
+const { verifyToken } = require('./auth');
 const router = express.Router();
 
 // Database connection
@@ -61,7 +62,7 @@ Return Codes:
 "SERVER_ERROR"
 =======================================================================================================================================
 */
-router.post('/create', async (req, res) => {
+router.post('/create', verifyToken, async (req, res) => {
   try {
     const { name, description, team_list_id, lives_per_player, no_team_twice, organiser_joins_as_player } = req.body;
 
@@ -82,7 +83,7 @@ router.post('/create', async (req, res) => {
 
     // TODO: Add authentication middleware to get actual user ID
     // For now, we'll use a placeholder
-    const organiser_id = 1; // This should come from authenticated user
+    const organiser_id = req.user.id;
 
     // Validate team_list exists and is accessible
     const teamListCheck = await pool.query(
@@ -130,7 +131,6 @@ router.post('/create', async (req, res) => {
 
     // Generate the invite code
     const inviteCode = await generateInviteCode(organiser_id);
-    console.log('Generated invite code:', inviteCode); // Debug log
 
     // Create the competition with invite code
     const result = await pool.query(`
@@ -145,7 +145,7 @@ router.post('/create', async (req, res) => {
         invite_code,
         created_at
       )
-      VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, 'OPEN', $4, $5, $6, $7, CURRENT_TIMESTAMP)
       RETURNING *
     `, [
       name.trim(),
@@ -299,10 +299,9 @@ Success Response:
 }
 =======================================================================================================================================
 */
-router.get('/my-competitions', async (req, res) => {
+router.get('/my-competitions', verifyToken, async (req, res) => {
   try {
-    // TODO: Get actual user ID from authentication middleware
-    const user_id = 1;
+    const user_id = req.user.id;
 
     const result = await pool.query(`
       SELECT 
@@ -315,12 +314,14 @@ router.get('/my-competitions', async (req, res) => {
         c.invite_code,
         c.created_at,
         tl.name as team_list_name,
-        COUNT(cu.user_id) as player_count
+        COUNT(cu_all.user_id) as player_count,
+        c.organiser_id
       FROM competition c
       JOIN team_list tl ON c.team_list_id = tl.id
-      LEFT JOIN competition_user cu ON c.id = cu.competition_id
-      WHERE c.organiser_id = $1
-      GROUP BY c.id, c.name, c.description, c.status, c.lives_per_player, c.no_team_twice, c.invite_code, c.created_at, tl.name
+      LEFT JOIN competition_user cu_all ON c.id = cu_all.competition_id
+      LEFT JOIN competition_user cu_player ON c.id = cu_player.competition_id AND cu_player.user_id = $1
+      WHERE (c.organiser_id = $1 OR cu_player.user_id = $1)
+      GROUP BY c.id, c.name, c.description, c.status, c.lives_per_player, c.no_team_twice, c.invite_code, c.created_at, tl.name, c.organiser_id
       ORDER BY c.created_at DESC
     `, [user_id]);
 
@@ -336,7 +337,8 @@ router.get('/my-competitions', async (req, res) => {
         invite_code: row.invite_code,
         team_list_name: row.team_list_name,
         player_count: parseInt(row.player_count),
-        created_at: row.created_at
+        created_at: row.created_at,
+        is_organiser: row.organiser_id === user_id
       }))
     });
 
@@ -385,7 +387,7 @@ Return Codes:
 "SERVER_ERROR"
 =======================================================================================================================================
 */
-router.post('/join', async (req, res) => {
+router.post('/join', verifyToken, async (req, res) => {
   try {
     const { invite_code } = req.body;
 
@@ -397,9 +399,7 @@ router.post('/join', async (req, res) => {
       });
     }
 
-    // TODO: Add authentication middleware to get actual user ID
-    // For now, we'll use a placeholder
-    const user_id = 1; // This should come from authenticated user
+    const user_id = req.user.id;
 
     // Find the competition by invite code
     const competitionResult = await pool.query(
@@ -509,10 +509,10 @@ Success Response:
 }
 =======================================================================================================================================
 */
-router.get('/:id/rounds', async (req, res) => {
+router.get('/:id/rounds', verifyToken, async (req, res) => {
   try {
     const competition_id = parseInt(req.params.id);
-    const user_id = 1; // TODO: Get from auth middleware
+    const user_id = req.user.id;
 
     // Verify user is the organiser
     const competitionCheck = await pool.query(
@@ -540,12 +540,13 @@ router.get('/:id/rounds', async (req, res) => {
         r.id,
         r.round_number,
         r.lock_time,
+        r.status,
         r.created_at,
         COUNT(f.id) as fixture_count
       FROM round r
       LEFT JOIN fixture f ON r.id = f.round_id
       WHERE r.competition_id = $1
-      GROUP BY r.id, r.round_number, r.lock_time, r.created_at
+      GROUP BY r.id, r.round_number, r.lock_time, r.status, r.created_at
       ORDER BY r.round_number ASC
     `, [competition_id]);
 
@@ -555,6 +556,7 @@ router.get('/:id/rounds', async (req, res) => {
         id: row.id,
         round_number: row.round_number,
         lock_time: row.lock_time,
+        status: row.status,
         fixture_count: parseInt(row.fixture_count),
         created_at: row.created_at
       }))
@@ -594,11 +596,11 @@ Success Response:
 }
 =======================================================================================================================================
 */
-router.post('/:id/rounds', async (req, res) => {
+router.post('/:id/rounds', verifyToken, async (req, res) => {
   try {
     const competition_id = parseInt(req.params.id);
     const { lock_time } = req.body;
-    const user_id = 1; // TODO: Get from auth middleware
+    const user_id = req.user.id;
 
     // Basic validation
     if (!lock_time) {
@@ -641,9 +643,10 @@ router.post('/:id/rounds', async (req, res) => {
         competition_id,
         round_number,
         lock_time,
+        status,
         created_at
       )
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, 'CLOSED', CURRENT_TIMESTAMP)
       RETURNING *
     `, [competition_id, nextRoundNumber, lock_time]);
 
@@ -710,11 +713,11 @@ Success Response:
 }
 =======================================================================================================================================
 */
-router.get('/:id/rounds/:roundId/fixtures', async (req, res) => {
+router.get('/:id/rounds/:roundId/fixtures', verifyToken, async (req, res) => {
   try {
     const competition_id = parseInt(req.params.id);
     const round_id = parseInt(req.params.roundId);
-    const user_id = 1; // TODO: Get from auth middleware
+    const user_id = req.user.id;
 
     // Verify user is the organiser
     const competitionCheck = await pool.query(
@@ -807,12 +810,12 @@ Request Payload:
 }
 =======================================================================================================================================
 */
-router.post('/:id/rounds/:roundId/fixtures', async (req, res) => {
+router.post('/:id/rounds/:roundId/fixtures', verifyToken, async (req, res) => {
   try {
     const competition_id = parseInt(req.params.id);
     const round_id = parseInt(req.params.roundId);
     const { home_team_id, away_team_id, kickoff_time } = req.body;
-    const user_id = 1; // TODO: Get from auth middleware
+    const user_id = req.user.id;
 
     // Basic validation
     if (!home_team_id || !away_team_id || !kickoff_time) {
@@ -832,7 +835,7 @@ router.post('/:id/rounds/:roundId/fixtures', async (req, res) => {
 
     // Verify user is the organiser and round exists
     const verifyResult = await pool.query(`
-      SELECT c.organiser_id, c.name as competition_name, r.round_number
+      SELECT c.organiser_id, c.name as competition_name, r.round_number, r.status
       FROM competition c
       JOIN round r ON c.id = r.competition_id
       WHERE c.id = $1 AND r.id = $2
@@ -849,6 +852,14 @@ router.post('/:id/rounds/:roundId/fixtures', async (req, res) => {
       return res.status(403).json({
         return_code: "UNAUTHORIZED",
         message: "Only the competition organiser can add fixtures"
+      });
+    }
+
+    // Check if round is OPEN (cannot modify fixtures for open rounds)
+    if (verifyResult.rows[0].status === 'OPEN') {
+      return res.status(400).json({
+        return_code: "ROUND_OPEN",
+        message: "Cannot modify fixtures for an open round. Close the round first."
       });
     }
 
@@ -969,12 +980,12 @@ Success Response:
 }
 =======================================================================================================================================
 */
-router.put('/:id/rounds/:roundId', async (req, res) => {
+router.put('/:id/rounds/:roundId', verifyToken, async (req, res) => {
   try {
     const competition_id = parseInt(req.params.id);
     const round_id = parseInt(req.params.roundId);
     const { lock_time } = req.body;
-    const user_id = 1; // TODO: Get from auth middleware
+    const user_id = req.user.id;
 
     // Basic validation
     if (!lock_time) {
@@ -1093,16 +1104,16 @@ Success Response:
 }
 =======================================================================================================================================
 */
-router.delete('/:id/rounds/:roundId/fixtures/:fixtureId', async (req, res) => {
+router.delete('/:id/rounds/:roundId/fixtures/:fixtureId', verifyToken, async (req, res) => {
   try {
     const competition_id = parseInt(req.params.id);
     const round_id = parseInt(req.params.roundId);
     const fixture_id = parseInt(req.params.fixtureId);
-    const user_id = 1; // TODO: Get from auth middleware
+    const user_id = req.user.id;
 
     // Verify user is the organiser and get fixture details
     const verifyResult = await pool.query(`
-      SELECT c.organiser_id, c.name as competition_name, r.round_number,
+      SELECT c.organiser_id, c.name as competition_name, r.round_number, r.status,
              f.home_team, f.away_team
       FROM competition c
       JOIN round r ON c.id = r.competition_id
@@ -1123,6 +1134,14 @@ router.delete('/:id/rounds/:roundId/fixtures/:fixtureId', async (req, res) => {
       return res.status(403).json({
         return_code: "UNAUTHORIZED",
         message: "Only the competition organiser can delete fixtures"
+      });
+    }
+
+    // Check if round is OPEN (cannot modify fixtures for open rounds)
+    if (fixture.status === 'OPEN') {
+      return res.status(400).json({
+        return_code: "ROUND_OPEN",
+        message: "Cannot modify fixtures for an open round. Close the round first."
       });
     }
 
@@ -1173,10 +1192,10 @@ Success Response:
 }
 =======================================================================================================================================
 */
-router.get('/:id/teams', async (req, res) => {
+router.get('/:id/teams', verifyToken, async (req, res) => {
   try {
     const competition_id = parseInt(req.params.id);
-    const user_id = 1; // TODO: Get from auth middleware
+    const user_id = req.user.id;
 
     // Verify competition exists and user has access
     const competitionResult = await pool.query(`
@@ -1217,6 +1236,813 @@ router.get('/:id/teams', async (req, res) => {
 
   } catch (error) {
     console.error('Get teams error:', error);
+    res.status(500).json({
+      return_code: "SERVER_ERROR",
+      message: "Internal server error"
+    });
+  }
+});
+
+/*
+=======================================================================================================================================
+API Route: competitions/:id/active-rounds
+=======================================================================================================================================
+Method: GET
+Purpose: Get active rounds for a competition where user can make picks
+=======================================================================================================================================
+Success Response:
+{
+  "return_code": "SUCCESS",
+  "rounds": [
+    {
+      "id": 1,
+      "round_number": 1,
+      "lock_time": "2025-08-25T14:00:00Z",
+      "status": "open",
+      "has_pick": false
+    }
+  ]
+}
+=======================================================================================================================================
+*/
+router.get('/:id/active-rounds', verifyToken, async (req, res) => {
+  try {
+    const competition_id = parseInt(req.params.id);
+    const user_id = req.user.id;
+
+    // Verify user has access to the competition (either as player or organiser)
+    const accessCheck = await pool.query(`
+      SELECT 
+        CASE 
+          WHEN c.organiser_id = $2 THEN 'organiser'
+          WHEN cu.user_id IS NOT NULL THEN 'player'
+          ELSE NULL
+        END as access_type,
+        cu.status as player_status
+      FROM competition c
+      LEFT JOIN competition_user cu ON cu.competition_id = c.id AND cu.user_id = $2
+      WHERE c.id = $1
+    `, [competition_id, user_id]);
+    
+    if (accessCheck.rows.length === 0 || !accessCheck.rows[0].access_type) {
+      return res.status(403).json({
+        return_code: "UNAUTHORIZED",
+        message: "You are not part of this competition"
+      });
+    }
+
+    // Get rounds where picks can be made (not locked yet)
+    const roundsResult = await pool.query(`
+      SELECT 
+        r.id,
+        r.round_number,
+        r.lock_time,
+        CASE WHEN p.id IS NOT NULL THEN true ELSE false END as has_pick
+      FROM round r
+      LEFT JOIN pick p ON r.id = p.round_id AND p.user_id = $2
+      WHERE r.competition_id = $1 
+        AND r.lock_time > CURRENT_TIMESTAMP
+      ORDER BY r.round_number ASC
+    `, [competition_id, user_id]);
+
+    res.json({
+      return_code: "SUCCESS",
+      rounds: roundsResult.rows
+    });
+
+  } catch (error) {
+    console.error('Get active rounds error:', error);
+    res.status(500).json({
+      return_code: "SERVER_ERROR",
+      message: "Internal server error"
+    });
+  }
+});
+
+/*
+=======================================================================================================================================
+API Route: competitions/:id/rounds/:roundId/pick
+=======================================================================================================================================
+Method: GET
+Purpose: Get user's pick for a specific round and available fixtures
+=======================================================================================================================================
+Success Response:
+{
+  "return_code": "SUCCESS",
+  "pick": {
+    "id": 1,
+    "team": "Arsenal",
+    "fixture_id": 5,
+    "locked_at": null
+  },
+  "fixtures": [...],
+  "previous_picks": ["Manchester United", "Chelsea"],
+  "round": {...}
+}
+=======================================================================================================================================
+*/
+router.get('/:id/rounds/:roundId/pick', verifyToken, async (req, res) => {
+  try {
+    const competition_id = parseInt(req.params.id);
+    const round_id = parseInt(req.params.roundId);
+    const user_id = req.user.id;
+
+    // Verify user is part of the competition
+    const memberCheck = await pool.query(`
+      SELECT cu.status, c.name as competition_name, r.round_number, r.lock_time
+      FROM competition_user cu
+      JOIN competition c ON cu.competition_id = c.id
+      JOIN round r ON c.id = r.competition_id
+      WHERE cu.competition_id = $1 AND cu.user_id = $2 AND r.id = $3
+    `, [competition_id, user_id, round_id]);
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({
+        return_code: "UNAUTHORIZED",
+        message: "You are not part of this competition or round not found"
+      });
+    }
+
+    const roundInfo = memberCheck.rows[0];
+
+    // Get user's current pick for this round
+    const pickResult = await pool.query(`
+      SELECT id, team, fixture_id, locked, created_at
+      FROM pick
+      WHERE round_id = $1 AND user_id = $2
+    `, [round_id, user_id]);
+
+    // Get all fixtures for this round
+    const fixturesResult = await pool.query(`
+      SELECT 
+        f.id,
+        f.home_team,
+        f.away_team,
+        f.home_team_short,
+        f.away_team_short,
+        f.kickoff_time,
+        f.home_score,
+        f.away_score
+      FROM fixture f
+      WHERE f.round_id = $1
+      ORDER BY f.kickoff_time ASC
+    `, [round_id]);
+
+    // Get user's previous picks (teams they can't pick again)
+    const previousPicksResult = await pool.query(`
+      SELECT DISTINCT p.team
+      FROM pick p
+      JOIN round r ON p.round_id = r.id
+      WHERE r.competition_id = $1 AND p.user_id = $2 AND p.team IS NOT NULL
+    `, [competition_id, user_id]);
+
+    res.json({
+      return_code: "SUCCESS",
+      pick: pickResult.rows.length > 0 ? pickResult.rows[0] : null,
+      fixtures: fixturesResult.rows,
+      previous_picks: previousPicksResult.rows.map(row => row.team),
+      round: {
+        id: round_id,
+        round_number: roundInfo.round_number,
+        lock_time: roundInfo.lock_time
+      }
+    });
+
+  } catch (error) {
+    console.error('Get pick error:', error);
+    res.status(500).json({
+      return_code: "SERVER_ERROR",
+      message: "Internal server error"
+    });
+  }
+});
+
+/*
+=======================================================================================================================================
+API Route: competitions/:id/rounds/:roundId/pick
+=======================================================================================================================================
+Method: POST
+Purpose: Make or update a pick for a round
+=======================================================================================================================================
+Request Body:
+{
+  "team": "Arsenal",
+  "fixture_id": 5
+}
+Success Response:
+{
+  "return_code": "SUCCESS",
+  "message": "Pick saved successfully",
+  "pick": {...}
+}
+=======================================================================================================================================
+*/
+router.post('/:id/rounds/:roundId/pick', verifyToken, async (req, res) => {
+  try {
+    const competition_id = parseInt(req.params.id);
+    const round_id = parseInt(req.params.roundId);
+    const { team, fixture_id } = req.body;
+    const user_id = req.user.id;
+
+    // Basic validation
+    if (!team || !fixture_id) {
+      return res.status(400).json({
+        return_code: "VALIDATION_ERROR",
+        message: "Team and fixture are required"
+      });
+    }
+
+    // Verify user is part of the competition and round isn't locked
+    const memberCheck = await pool.query(`
+      SELECT cu.status, r.lock_time
+      FROM competition_user cu
+      JOIN competition c ON cu.competition_id = c.id
+      JOIN round r ON c.id = r.competition_id
+      WHERE cu.competition_id = $1 AND cu.user_id = $2 AND r.id = $3
+    `, [competition_id, user_id, round_id]);
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({
+        return_code: "UNAUTHORIZED",
+        message: "You are not part of this competition or round not found"
+      });
+    }
+
+    const roundInfo = memberCheck.rows[0];
+
+    // Check if round is locked
+    const now = new Date();
+    const lockTime = new Date(roundInfo.lock_time);
+    if (now >= lockTime) {
+      return res.status(400).json({
+        return_code: "ROUND_LOCKED",
+        message: "This round is locked and picks cannot be changed"
+      });
+    }
+
+    // Check if existing pick is individually locked
+    const existingPickCheck = await pool.query(`
+      SELECT locked FROM pick
+      WHERE round_id = $1 AND user_id = $2
+    `, [round_id, user_id]);
+
+    if (existingPickCheck.rows.length > 0 && existingPickCheck.rows[0].locked) {
+      return res.status(400).json({
+        return_code: "PICK_LOCKED",
+        message: "Your pick is locked and cannot be changed"
+      });
+    }
+
+    // Check if team was already picked in previous rounds
+    const previousPickCheck = await pool.query(`
+      SELECT p.team
+      FROM pick p
+      JOIN round r ON p.round_id = r.id
+      WHERE r.competition_id = $1 AND p.user_id = $2 AND p.team = $3
+    `, [competition_id, user_id, team]);
+
+    if (previousPickCheck.rows.length > 0) {
+      return res.status(400).json({
+        return_code: "TEAM_ALREADY_PICKED",
+        message: "You have already picked this team in a previous round"
+      });
+    }
+
+    // Verify fixture exists and team is in the fixture
+    const fixtureCheck = await pool.query(`
+      SELECT home_team, away_team
+      FROM fixture
+      WHERE id = $1 AND round_id = $2
+    `, [fixture_id, round_id]);
+
+    if (fixtureCheck.rows.length === 0) {
+      return res.status(400).json({
+        return_code: "FIXTURE_NOT_FOUND",
+        message: "Fixture not found"
+      });
+    }
+
+    const fixture = fixtureCheck.rows[0];
+    if (team !== fixture.home_team && team !== fixture.away_team) {
+      return res.status(400).json({
+        return_code: "INVALID_TEAM",
+        message: "Selected team is not playing in this fixture"
+      });
+    }
+
+    // Insert or update the pick
+    const result = await pool.query(`
+      INSERT INTO pick (round_id, user_id, team, fixture_id, created_at)
+      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+      ON CONFLICT (round_id, user_id)
+      DO UPDATE SET team = $3, fixture_id = $4, created_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [round_id, user_id, team, fixture_id]);
+
+    const pick = result.rows[0];
+
+    // Log the pick
+    await pool.query(`
+      INSERT INTO audit_log (competition_id, user_id, action, details)
+      VALUES ($1, $2, 'Pick Made', $3)
+    `, [
+      competition_id,
+      user_id,
+      `Picked ${team} for Round ${roundInfo.round_number || round_id}`
+    ]);
+
+    res.json({
+      return_code: "SUCCESS",
+      message: "Pick saved successfully",
+      pick: pick
+    });
+
+  } catch (error) {
+    console.error('Create pick error:', error);
+    res.status(500).json({
+      return_code: "SERVER_ERROR",
+      message: "Internal server error"
+    });
+  }
+});
+
+/*
+=======================================================================================================================================
+API Route: competitions/:id/rounds/:roundId/status
+=======================================================================================================================================
+Method: PATCH
+Purpose: Change round status (OPEN/CLOSE) - Admin action from status flow
+=======================================================================================================================================
+*/
+router.patch('/:id/rounds/:roundId/status', verifyToken, async (req, res) => {
+  try {
+    const competition_id = parseInt(req.params.id);
+    const round_id = parseInt(req.params.roundId);
+    const { status } = req.body;
+    const user_id = req.user.id;
+
+    // Validate status
+    if (!status || !['OPEN', 'CLOSED'].includes(status)) {
+      return res.status(400).json({
+        return_code: "VALIDATION_ERROR",
+        message: "Status must be either OPEN or CLOSED"
+      });
+    }
+
+    // Verify user is the organiser
+    const competitionCheck = await pool.query(
+      'SELECT organiser_id, name FROM competition WHERE id = $1',
+      [competition_id]
+    );
+
+    if (competitionCheck.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "COMPETITION_NOT_FOUND",
+        message: "Competition not found"
+      });
+    }
+
+    if (competitionCheck.rows[0].organiser_id !== user_id) {
+      return res.status(403).json({
+        return_code: "UNAUTHORIZED",
+        message: "Only the competition organiser can change round status"
+      });
+    }
+
+    // Update round status
+    const result = await pool.query(`
+      UPDATE round 
+      SET status = $1 
+      WHERE id = $2 AND competition_id = $3
+      RETURNING *
+    `, [status, round_id, competition_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "ROUND_NOT_FOUND",
+        message: "Round not found"
+      });
+    }
+
+    const round = result.rows[0];
+
+    // Log the action
+    await pool.query(`
+      INSERT INTO audit_log (competition_id, user_id, action, details)
+      VALUES ($1, $2, 'Round Status Changed', $3)
+    `, [
+      competition_id,
+      user_id,
+      `Changed Round ${round.round_number} status to ${status}`
+    ]);
+
+    res.json({
+      return_code: "SUCCESS",
+      message: `Round ${round.round_number} ${status === 'OPEN' ? 'opened' : 'closed'} successfully`,
+      round: round
+    });
+
+  } catch (error) {
+    console.error('Change round status error:', error);
+    res.status(500).json({
+      return_code: "SERVER_ERROR",
+      message: "Internal server error"
+    });
+  }
+});
+
+/*
+=======================================================================================================================================
+API Route: competitions/:id/rounds/:roundId/results
+=======================================================================================================================================
+Method: GET
+Purpose: Get round data for applying results (fixtures and picks)
+=======================================================================================================================================
+*/
+router.get('/:id/rounds/:roundId/results', verifyToken, async (req, res) => {
+  try {
+    const competition_id = parseInt(req.params.id);
+    const round_id = parseInt(req.params.roundId);
+    const user_id = req.user.id;
+
+    // Verify user is the organiser
+    const competitionCheck = await pool.query(
+      'SELECT organiser_id, name FROM competition WHERE id = $1',
+      [competition_id]
+    );
+
+    if (competitionCheck.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "COMPETITION_NOT_FOUND",
+        message: "Competition not found"
+      });
+    }
+
+    if (competitionCheck.rows[0].organiser_id !== user_id) {
+      return res.status(403).json({
+        return_code: "UNAUTHORIZED",
+        message: "Only the competition organiser can apply results"
+      });
+    }
+
+    // Get round details
+    const roundResult = await pool.query(`
+      SELECT r.id, r.round_number, r.status, r.lock_time
+      FROM round r
+      WHERE r.id = $1 AND r.competition_id = $2
+    `, [round_id, competition_id]);
+
+    if (roundResult.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "ROUND_NOT_FOUND",
+        message: "Round not found"
+      });
+    }
+
+    const round = roundResult.rows[0];
+
+    // Get fixtures for this round
+    const fixturesResult = await pool.query(`
+      SELECT f.id, f.home_team, f.away_team, f.home_team_short, f.away_team_short, f.kickoff_time, f.result
+      FROM fixture f
+      WHERE f.round_id = $1
+      ORDER BY f.kickoff_time ASC
+    `, [round_id]);
+
+    // Get all picks for this round
+    const picksResult = await pool.query(`
+      SELECT p.id, p.user_id, p.team, p.fixture_id, p.outcome,
+             u.display_name
+      FROM pick p
+      JOIN app_user u ON p.user_id = u.id
+      WHERE p.round_id = $1
+      ORDER BY u.display_name ASC
+    `, [round_id]);
+
+    res.json({
+      return_code: "SUCCESS",
+      round: round,
+      fixtures: fixturesResult.rows,
+      picks: picksResult.rows
+    });
+
+  } catch (error) {
+    console.error('Get results data error:', error);
+    res.status(500).json({
+      return_code: "SERVER_ERROR",
+      message: "Internal server error"
+    });
+  }
+});
+
+/*
+=======================================================================================================================================
+API Route: competitions/:id/rounds/:roundId/results
+=======================================================================================================================================
+Method: POST
+Purpose: Apply fixture results and update pick outcomes
+=======================================================================================================================================
+Request Payload:
+{
+  "fixture_results": [
+    {
+      "fixture_id": 123,
+      "result": "home_win" | "away_win" | "draw"
+    }
+  ]
+}
+=======================================================================================================================================
+*/
+router.post('/:id/rounds/:roundId/results', verifyToken, async (req, res) => {
+  try {
+    const competition_id = parseInt(req.params.id);
+    const round_id = parseInt(req.params.roundId);
+    const { fixture_results } = req.body;
+    const user_id = req.user.id;
+
+    // Basic validation
+    if (!fixture_results || !Array.isArray(fixture_results)) {
+      return res.status(400).json({
+        return_code: "VALIDATION_ERROR",
+        message: "Fixture results are required"
+      });
+    }
+
+    // Verify user is the organiser
+    const competitionCheck = await pool.query(
+      'SELECT organiser_id, name FROM competition WHERE id = $1',
+      [competition_id]
+    );
+
+    if (competitionCheck.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "COMPETITION_NOT_FOUND",
+        message: "Competition not found"
+      });
+    }
+
+    if (competitionCheck.rows[0].organiser_id !== user_id) {
+      return res.status(403).json({
+        return_code: "UNAUTHORIZED",
+        message: "Only the competition organiser can apply results"
+      });
+    }
+
+    // Verify round exists and is CLOSED
+    const roundCheck = await pool.query(
+      'SELECT id, round_number, status FROM round WHERE id = $1 AND competition_id = $2',
+      [round_id, competition_id]
+    );
+
+    if (roundCheck.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "ROUND_NOT_FOUND", 
+        message: "Round not found"
+      });
+    }
+
+    const round = roundCheck.rows[0];
+
+    if (round.status !== 'CLOSED') {
+      return res.status(400).json({
+        return_code: "ROUND_NOT_CLOSED",
+        message: "Can only apply results to closed rounds"
+      });
+    }
+
+    let updatedFixtures = 0;
+
+    // Process each fixture result
+    for (const fixtureResult of fixture_results) {
+      const { fixture_id, result } = fixtureResult;
+
+      if (!['home_win', 'away_win', 'draw'].includes(result)) {
+        return res.status(400).json({
+          return_code: "VALIDATION_ERROR",
+          message: `Invalid result: ${result}. Must be home_win, away_win, or draw`
+        });
+      }
+
+      // Get fixture details
+      const fixtureDetails = await pool.query(
+        'SELECT home_team_short, away_team_short FROM fixture WHERE id = $1 AND round_id = $2',
+        [fixture_id, round_id]
+      );
+
+      if (fixtureDetails.rows.length === 0) {
+        continue; // Skip if fixture not found
+      }
+
+      const fixture = fixtureDetails.rows[0];
+
+      // Determine result string for database storage
+      let resultString;
+      if (result === 'home_win') {
+        resultString = fixture.home_team_short;
+      } else if (result === 'away_win') {
+        resultString = fixture.away_team_short;
+      } else {
+        resultString = 'DRAW';
+      }
+
+      // Update fixture with result
+      const updateResult = await pool.query(`
+        UPDATE fixture 
+        SET result = $1
+        WHERE id = $2 AND round_id = $3
+        RETURNING id
+      `, [resultString, fixture_id, round_id]);
+
+      if (updateResult.rowCount > 0) {
+        updatedFixtures++;
+      }
+    }
+
+    // Clear any existing pick outcomes (as requested)
+    await pool.query(`
+      UPDATE pick 
+      SET outcome = NULL
+      WHERE round_id = $1
+    `, [round_id]);
+
+    // Log the action
+    await pool.query(`
+      INSERT INTO audit_log (competition_id, user_id, action, details)
+      VALUES ($1, $2, 'Results Applied', $3)
+    `, [
+      competition_id,
+      user_id,
+      `Applied results for Round ${round.round_number}, updated ${updatedFixtures} fixtures`
+    ]);
+
+    res.json({
+      return_code: "SUCCESS",
+      message: `Results applied successfully. ${updatedFixtures} fixture${updatedFixtures !== 1 ? 's' : ''} updated.`,
+      updated_fixtures: updatedFixtures
+    });
+
+  } catch (error) {
+    console.error('Apply results error:', error);
+    res.status(500).json({
+      return_code: "SERVER_ERROR", 
+      message: "Internal server error"
+    });
+  }
+});
+
+/*
+=======================================================================================================================================
+API Route: competitions/:id/rounds/:roundId/calculate-winners
+=======================================================================================================================================
+Method: POST
+Purpose: Calculate pick outcomes based on fixture results
+=======================================================================================================================================
+Success Response:
+{
+  "return_code": "SUCCESS",
+  "message": "Pick outcomes calculated successfully",
+  "results": {
+    "winners": 5,
+    "losers": 3,
+    "draws": 2
+  }
+}
+=======================================================================================================================================
+*/
+router.post('/:id/rounds/:roundId/calculate-winners', verifyToken, async (req, res) => {
+  try {
+    const competition_id = parseInt(req.params.id);
+    const round_id = parseInt(req.params.roundId);
+    const user_id = req.user.id;
+
+    // Verify user is the organiser
+    const competitionCheck = await pool.query(
+      'SELECT organiser_id, name FROM competition WHERE id = $1',
+      [competition_id]
+    );
+
+    if (competitionCheck.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "COMPETITION_NOT_FOUND",
+        message: "Competition not found"
+      });
+    }
+
+    if (competitionCheck.rows[0].organiser_id !== user_id) {
+      return res.status(403).json({
+        return_code: "UNAUTHORIZED",
+        message: "Only the competition organiser can calculate winners"
+      });
+    }
+
+    // Get round details
+    const roundResult = await pool.query(`
+      SELECT r.id, r.round_number, r.status
+      FROM round r
+      WHERE r.id = $1 AND r.competition_id = $2
+    `, [round_id, competition_id]);
+
+    if (roundResult.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "ROUND_NOT_FOUND",
+        message: "Round not found"
+      });
+    }
+
+    // Get all picks and their corresponding fixture results
+    const picksAndResults = await pool.query(`
+      SELECT p.id as pick_id, p.team, p.fixture_id, p.user_id,
+             f.home_team, f.away_team, f.home_team_short, f.away_team_short, f.result,
+             u.display_name
+      FROM pick p
+      JOIN fixture f ON p.fixture_id = f.id
+      JOIN app_user u ON p.user_id = u.id
+      WHERE p.round_id = $1
+    `, [round_id]);
+
+    if (picksAndResults.rows.length === 0) {
+      return res.status(400).json({
+        return_code: "NO_PICKS",
+        message: "No picks found for this round"
+      });
+    }
+
+    let winners = 0;
+    let losers = 0;
+    let draws = 0;
+    let unresolved = 0;
+
+    // Calculate outcomes for each pick
+    for (const pick of picksAndResults.rows) {
+      let outcome = null;
+
+      if (!pick.result) {
+        // No result set for this fixture yet
+        unresolved++;
+        continue;
+      }
+
+      if (pick.result === 'DRAW') {
+        // Draw - all picks get draw outcome
+        outcome = 'DRAW';
+        draws++;
+      } else if (pick.result === pick.home_team_short || pick.result === pick.away_team_short) {
+        // Check if the pick matches the winning team
+        if (pick.team === pick.home_team && pick.result === pick.home_team_short) {
+          // Picked home team and home team won
+          outcome = 'WIN';
+          winners++;
+        } else if (pick.team === pick.away_team && pick.result === pick.away_team_short) {
+          // Picked away team and away team won
+          outcome = 'WIN';
+          winners++;
+        } else {
+          // Picked wrong team
+          outcome = 'LOSE';
+          losers++;
+        }
+      }
+
+      // Update the pick with the calculated outcome
+      if (outcome) {
+        await pool.query(`
+          UPDATE pick 
+          SET outcome = $1
+          WHERE id = $2
+        `, [outcome, pick.pick_id]);
+      }
+    }
+
+    if (unresolved > 0) {
+      return res.status(400).json({
+        return_code: "INCOMPLETE_RESULTS",
+        message: `Cannot calculate winners: ${unresolved} fixture(s) still need results`
+      });
+    }
+
+    // Log the calculation
+    await pool.query(`
+      INSERT INTO audit_log (competition_id, user_id, action, details)
+      VALUES ($1, $2, 'Winners Calculated', $3)
+    `, [
+      competition_id,
+      user_id,
+      `Calculated outcomes for Round ${roundResult.rows[0].round_number}: ${winners} winners, ${losers} losers, ${draws} draws`
+    ]);
+
+    res.json({
+      return_code: "SUCCESS",
+      message: "Pick outcomes calculated successfully",
+      results: {
+        winners,
+        losers,
+        draws,
+        total: winners + losers + draws
+      }
+    });
+
+  } catch (error) {
+    console.error('Calculate winners error:', error);
     res.status(500).json({
       return_code: "SERVER_ERROR",
       message: "Internal server error"

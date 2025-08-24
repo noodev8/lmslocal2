@@ -16,7 +16,7 @@ const rateLimit = require('express-rate-limit');
 
 // Import routes
 const healthRoute = require('./routes/health');
-const authRoute = require('./routes/auth');
+const { router: authRoute } = require('./routes/auth');
 const competitionRoute = require('./routes/competition');
 
 const app = express();
@@ -54,7 +54,7 @@ app.use(limiter);
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -62,11 +62,11 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
-});
+// Request logging middleware (disabled for cleaner output)
+// app.use((req, res, next) => {
+//   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+//   next();
+// });
 
 // Routes
 app.use('/health', healthRoute);

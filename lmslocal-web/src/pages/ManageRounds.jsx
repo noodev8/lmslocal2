@@ -15,6 +15,8 @@ const ManageRounds = () => {
   const [formData, setFormData] = useState({
     lock_time: ''
   })
+  const [statusLoading, setStatusLoading] = useState({})
+  const [calculateLoading, setCalculateLoading] = useState({})
 
   // Load competition details and rounds
   useEffect(() => {
@@ -48,6 +50,29 @@ const ManageRounds = () => {
 
     loadData()
   }, [competitionId])
+
+  // Reload data when component becomes visible again (after navigation)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (!loading && !roundsLoading) {
+        // Reload rounds data when window regains focus
+        const reloadRounds = async () => {
+          try {
+            const roundsResponse = await axios.get(`/competitions/${competitionId}/rounds`)
+            if (roundsResponse.data.return_code === 'SUCCESS') {
+              setRounds(roundsResponse.data.rounds)
+            }
+          } catch (error) {
+            console.error('Failed to reload rounds:', error)
+          }
+        }
+        reloadRounds()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [competitionId, loading, roundsLoading])
 
   const handleInputChange = (e) => {
     setFormData({
@@ -94,6 +119,60 @@ const ManageRounds = () => {
       hour: '2-digit',
       minute: '2-digit'
     })
+  }
+
+  const handleRoundStatusChange = async (roundId, newStatus) => {
+    setStatusLoading(prev => ({ ...prev, [roundId]: true }))
+    setError('')
+    
+    try {
+      const response = await axios.patch(`/competitions/${competitionId}/rounds/${roundId}/status`, {
+        status: newStatus
+      })
+
+      if (response.data.return_code === 'SUCCESS') {
+        // Update round status in the list
+        setRounds(prevRounds => 
+          prevRounds.map(round => 
+            round.id === roundId 
+              ? { ...round, status: newStatus }
+              : round
+          )
+        )
+      } else {
+        setError(response.data.message || 'Failed to change round status')
+      }
+    } catch (error) {
+      console.error('Failed to change round status:', error)
+      setError(error.response?.data?.message || 'Failed to change round status')
+    } finally {
+      setStatusLoading(prev => ({ ...prev, [roundId]: false }))
+    }
+  }
+
+  const handleCalculateWinners = async (roundId) => {
+    setCalculateLoading(prev => ({ ...prev, [roundId]: true }))
+    setError('')
+    
+    try {
+      const response = await axios.post(`/competitions/${competitionId}/rounds/${roundId}/calculate-winners`)
+
+      if (response.data.return_code === 'SUCCESS') {
+        // Show success message with results
+        const results = response.data.results
+        alert(`Winners calculated successfully!\n\nResults:\n- Winners: ${results.winners}\n- Losers: ${results.losers}\n- Draws: ${results.draws}\n- Total: ${results.total}`)
+        
+        // Optionally reload rounds to update any status changes
+        loadRounds()
+      } else {
+        setError(response.data.message || 'Failed to calculate winners')
+      }
+    } catch (error) {
+      console.error('Failed to calculate winners:', error)
+      setError(error.response?.data?.message || 'Failed to calculate winners')
+    } finally {
+      setCalculateLoading(prev => ({ ...prev, [roundId]: false }))
+    }
   }
 
   const getDefaultLockTime = () => {
@@ -320,6 +399,15 @@ const ManageRounds = () => {
                           </svg>
                           Created: {formatDateTime(round.created_at)}
                         </p>
+                        <div className="flex items-center mt-2">
+                          <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                            round.status === 'OPEN' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {round.status || 'CLOSED'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     
@@ -333,6 +421,68 @@ const ManageRounds = () => {
                         </svg>
                         <span>Manage Fixtures</span>
                       </Link>
+                      
+                      {/* Show Apply Results button only for CLOSED rounds with fixtures */}
+                      {round.status === 'CLOSED' && round.fixture_count > 0 && (
+                        <Link
+                          to={`/competitions/${competitionId}/rounds/${round.id}/results`}
+                          className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-medium px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                          </svg>
+                          <span>Apply Results</span>
+                        </Link>
+                      )}
+                      
+                      {/* Show Calculate Winners button for CLOSED rounds with fixtures */}
+                      {round.status === 'CLOSED' && round.fixture_count > 0 && (
+                        <button
+                          onClick={() => handleCalculateWinners(round.id)}
+                          disabled={calculateLoading[round.id]}
+                          className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-medium px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
+                        >
+                          {calculateLoading[round.id] ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              <span>Calculating...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0V5a2 2 0 012-2h2a2 2 0 00-2-2m0 0V9a2 2 0 012-2h2a2 2 0 00-2-2m0 0V5a2 2 0 012-2h2a2 2 0 00-2-2" />
+                              </svg>
+                              <span>Calculate Winners</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                      
+                      <button
+                        onClick={() => handleRoundStatusChange(round.id, round.status === 'OPEN' ? 'CLOSED' : 'OPEN')}
+                        disabled={statusLoading[round.id]}
+                        className={`font-medium px-4 py-2 rounded-lg transition-all flex items-center space-x-2 ${
+                          statusLoading[round.id] 
+                            ? 'bg-gray-400 cursor-not-allowed text-white'
+                            : round.status === 'OPEN'
+                            ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                            : 'bg-green-500 hover:bg-green-600 text-white'
+                        }`}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                d={round.status === 'OPEN' 
+                                  ? "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                  : "M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+                                } />
+                        </svg>
+                        <span>
+                          {statusLoading[round.id] 
+                            ? 'Updating...' 
+                            : round.status === 'OPEN' ? 'Close Round' : 'Open Round'
+                          }
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>

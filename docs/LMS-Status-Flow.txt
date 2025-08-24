@@ -1,0 +1,21 @@
+ADMIN ACTION	ROUND STATUS	ROUND TASK FLOW	MANUAL / AUTO
+CREATE	CLOSED	----	Manual
+----	CLOSED	Round number generated	Auto
+----	CLOSED	Setting Fixtures and Lock time	Manual
+OPEN	OPEN	----	Manual
+----	OPEN	Players make their choices	Manual
+----	CLOSED	Lock time arrives or all choices made	Auto
+CLOSE	CLOSED	----	Auto
+----	CLOSED	Applying results	Manual
+CALCULATE WINNERS	CLOSED	----	Manual
+----	COMPLETE	Determine player progress	Auto
+			
+COMPETITION STATUS			
+OPEN			
+CANCEL			
+DRAW			
+WINNER			
+			
+Admin can			
+Re-Open			
+Cancel			

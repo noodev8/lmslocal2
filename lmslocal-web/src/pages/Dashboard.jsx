@@ -8,6 +8,7 @@ const Dashboard = () => {
   const location = useLocation()
   const [competitions, setCompetitions] = useState([])
   const [competitionsLoading, setCompetitionsLoading] = useState(true)
+  const [activeRounds, setActiveRounds] = useState({})
   const [successMessage, setSuccessMessage] = useState('')
 
   // Handle success message from create competition
@@ -21,13 +22,36 @@ const Dashboard = () => {
     }
   }, [location.state])
 
-  // Load user's competitions
+  // Load user's competitions and active rounds
   useEffect(() => {
     const loadCompetitions = async () => {
       try {
         const response = await axios.get('/competitions/my-competitions')
         if (response.data.return_code === 'SUCCESS') {
-          setCompetitions(response.data.competitions)
+          const competitions = response.data.competitions
+          setCompetitions(competitions)
+          
+          // Load active rounds for each competition (only for players)
+          const roundsPromises = competitions.map(async (competition) => {
+            if (!competition.is_organiser) {
+              try {
+                const roundsResponse = await axios.get(`/competitions/${competition.id}/active-rounds`)
+                if (roundsResponse.data.return_code === 'SUCCESS') {
+                  return { competitionId: competition.id, rounds: roundsResponse.data.rounds }
+                }
+              } catch (error) {
+                console.error(`Failed to load active rounds for competition ${competition.id}:`, error)
+              }
+            }
+            return { competitionId: competition.id, rounds: [] }
+          })
+          
+          const roundsResults = await Promise.all(roundsPromises)
+          const activeRoundsMap = {}
+          roundsResults.forEach(({ competitionId, rounds }) => {
+            activeRoundsMap[competitionId] = rounds
+          })
+          setActiveRounds(activeRoundsMap)
         }
       } catch (error) {
         console.error('Failed to load competitions:', error)
@@ -43,43 +67,16 @@ const Dashboard = () => {
     logout()
   }
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'draft': return 'bg-gray-100 text-gray-800'
-      case 'active': return 'bg-green-100 text-green-800'
-      case 'completed': return 'bg-blue-100 text-blue-800'
-      case 'paused': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'draft': 
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-        )
-      case 'active':
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l2.414 2.414a1 1 0 00.707.293H15M9 10V9a3 3 0 013-3m0 0a3 3 0 013 3v1M12 6V3" />
-          </svg>
-        )
-      case 'completed':
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        )
-      default:
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        )
-    }
+  const getOrganiserBadge = () => {
+    return (
+      <span className="px-3 py-1 text-xs font-medium rounded-full flex items-center space-x-1 bg-blue-100 text-blue-800">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span>Organiser</span>
+      </span>
+    )
   }
 
   return (
@@ -182,11 +179,11 @@ const Dashboard = () => {
         </div>
 
         {/* Current Competitions */}
-        <div className="bg-white/90 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl p-8 mb-12">
+        <div className="bg-white/90 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl p-8">
           <div className="flex justify-between items-center mb-8">
             <div>
               <h3 className="text-2xl font-bold text-gray-900 mb-1">Your Competitions</h3>
-              <p className="text-gray-600">Manage and track your competitions</p>
+              <p className="text-gray-600">Competitions you've created or joined</p>
             </div>
             <div className="bg-gradient-to-r from-blue-100 to-purple-100 px-4 py-2 rounded-full">
               <span className="text-sm font-medium text-gray-700">
@@ -221,157 +218,115 @@ const Dashboard = () => {
               competitions.map((competition) => (
                 <div key={competition.id} className="bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl p-6 hover:bg-white/90 hover:shadow-lg transition-all duration-200">
                   <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-1">{competition.name}</h4>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h4 className="text-lg font-semibold text-gray-900">{competition.name}</h4>
+                        {competition.is_organiser && getOrganiserBadge()}
+                      </div>
                       {competition.description && (
                         <p className="text-gray-600 text-sm mb-2">{competition.description}</p>
                       )}
-                      <p className="text-gray-500 text-sm">Using {competition.team_list_name}</p>
-                    </div>
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full flex items-center space-x-1 ${getStatusColor(competition.status)}`}>
-                      {getStatusIcon(competition.status)}
-                      <span className="capitalize">{competition.status}</span>
-                    </span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
-                    <div className="flex items-center space-x-4">
-                      <span>{competition.player_count} players</span>
-                      <span>•</span>
-                      <span>{competition.lives_per_player} {competition.lives_per_player === 1 ? 'life' : 'lives'} per player</span>
-                      {competition.no_team_twice && (
-                        <>
-                          <span>•</span>
-                          <span>No team twice rule</span>
-                        </>
-                      )}
-                    </div>
-                    <span>Created {new Date(competition.created_at).toLocaleDateString()}</span>
-                  </div>
-                  
-                  {/* Invite Code Section */}
-                  <div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg p-3 mb-4 border border-primary-200/50">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-medium text-primary-700 block mb-1">Invite Code</span>
-                        <span className="text-sm font-mono font-bold text-primary-800">{competition.invite_code}</span>
+                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        <span>{competition.player_count} players</span>
+                        <span>•</span>
+                        <span>Using {competition.team_list_name}</span>
                       </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(competition.invite_code)
-                          // Could add a toast notification here
-                        }}
-                        className="px-2 py-1 text-xs bg-white hover:bg-gray-50 text-primary-700 rounded-md border border-primary-200 hover:border-primary-300 transition-all flex items-center space-x-1"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <span>Copy</span>
-                      </button>
                     </div>
                   </div>
+                  
+                  {/* Show invite code only for organisers */}
+                  {competition.is_organiser && (
+                    <div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg p-3 mb-4 border border-primary-200/50">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-medium text-primary-700 block mb-1">Invite Code</span>
+                          <span className="text-sm font-mono font-bold text-primary-800">{competition.invite_code}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(competition.invite_code)
+                          }}
+                          className="px-2 py-1 text-xs bg-white hover:bg-gray-50 text-primary-700 rounded-md border border-primary-200 hover:border-primary-300 transition-all flex items-center space-x-1"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          <span>Copy</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show player status for players */}
+                  {!competition.is_organiser && competition.player_status && (
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 mb-4 border border-green-200/50">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-medium text-green-700 block">Status:</span>
+                        <span className="text-sm font-semibold text-green-800 capitalize">{competition.player_status}</span>
+                        {competition.lives_remaining !== null && (
+                          <>
+                            <span className="text-green-600">•</span>
+                            <span className="text-sm text-green-700">{competition.lives_remaining} lives remaining</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-2">
-                      {competition.status === 'draft' && (
-                        <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full border border-orange-200">
-                          Ready to configure and launch
-                        </span>
+                      {/* Show pick buttons for players only */}
+                      {!competition.is_organiser && activeRounds[competition.id] && activeRounds[competition.id].length > 0 && (
+                        <div className="flex space-x-1">
+                          {activeRounds[competition.id].map((round) => (
+                            <Link
+                              key={round.id}
+                              to={`/competitions/${competition.id}/rounds/${round.id}/pick`}
+                              className={`px-3 py-1 text-xs rounded-lg font-medium transition-all flex items-center space-x-1 ${
+                                round.has_pick
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                              }`}
+                            >
+                              {round.has_pick ? (
+                                <>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>Round {round.round_number}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                  <span>Pick Round {round.round_number}</span>
+                                </>
+                              )}
+                            </Link>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    <Link
-                      to={`/competitions/${competition.id}/rounds`}
-                      className="text-primary-600 hover:text-primary-700 font-medium text-sm flex items-center space-x-1 hover:space-x-2 transition-all"
-                    >
-                      <span>Manage Rounds</span>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2V7z" />
-                      </svg>
-                    </Link>
+
+                    <div className="flex items-center space-x-2">
+                      {/* Show admin buttons only for organisers */}
+                      {competition.is_organiser && (
+                        <Link
+                          to={`/competitions/${competition.id}/rounds`}
+                          className="text-primary-600 hover:text-primary-700 font-medium text-sm flex items-center space-x-1 hover:space-x-2 transition-all"
+                        >
+                          <span>Manage Rounds</span>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2V7z" />
+                          </svg>
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
             )}
-          </div>
-        </div>
-
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Quick Overview */}
-          <div className="lg:col-span-2">
-            <div className="bg-white/90 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl p-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">Quick Overview</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-6 text-center border border-primary-200/50 shadow-lg">
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                    </svg>
-                  </div>
-                  <div className="text-3xl font-bold text-primary-600 mb-2">0</div>
-                  <div className="text-sm font-semibold text-primary-900">Active Competitions</div>
-                </div>
-                
-                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 text-center border border-green-200/50 shadow-lg">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                    </svg>
-                  </div>
-                  <div className="text-3xl font-bold text-green-600 mb-2">0</div>
-                  <div className="text-sm font-semibold text-green-900">Total Players</div>
-                </div>
-                
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 text-center border border-blue-200/50 shadow-lg">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div className="text-3xl font-bold text-blue-600 mb-2">0</div>
-                  <div className="text-sm font-semibold text-blue-900">Completed Rounds</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="space-y-6">
-            <div className="bg-white/90 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h3>
-              <div className="space-y-3">
-                <button className="w-full text-left p-4 rounded-xl hover:bg-white/50 transition-all duration-200 flex items-center space-x-4 group border border-transparent hover:border-blue-200/50">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">Manage Players</div>
-                    <div className="text-sm text-gray-600">Add or remove players</div>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-                
-                <button className="w-full text-left p-4 rounded-xl hover:bg-white/50 transition-all duration-200 flex items-center space-x-4 group border border-transparent hover:border-purple-200/50">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">Settings</div>
-                    <div className="text-sm text-gray-600">Configure preferences</div>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </main>

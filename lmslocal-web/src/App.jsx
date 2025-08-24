@@ -10,6 +10,8 @@ import CreateCompetition from './pages/CreateCompetition'
 import JoinCompetition from './pages/JoinCompetition'
 import ManageRounds from './pages/ManageRounds'
 import ManageFixtures from './pages/ManageFixtures'
+import ApplyResults from './pages/ApplyResults'
+import MakePick from './pages/MakePick'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 // Protected Route Component
@@ -45,7 +47,12 @@ const PublicRoute = ({ children }) => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}
+      >
         <div className="min-h-screen">
           <Routes>
             <Route path="/" element={<Landing />} />
@@ -118,6 +125,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ManageFixtures />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/competitions/:competitionId/rounds/:roundId/results" 
+              element={
+                <ProtectedRoute>
+                  <ApplyResults />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/competitions/:competitionId/rounds/:roundId/pick" 
+              element={
+                <ProtectedRoute>
+                  <MakePick />
                 </ProtectedRoute>
               } 
             />

@@ -49,6 +49,12 @@ const ManageFixtures = () => {
           const roundData = roundsResponse.data.rounds.find(r => r.id === parseInt(roundId))
           if (roundData) {
             setRound(roundData)
+            
+            // Block access if round is OPEN
+            if (roundData.status === 'OPEN') {
+              setError('Cannot modify fixtures for an open round. Please close the round first.')
+              return
+            }
           } else {
             setError('Round not found')
             return
