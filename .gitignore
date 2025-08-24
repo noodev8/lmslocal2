@@ -7,6 +7,11 @@ Thumbs.db
 *.swo
 *.tmp
 *.lock
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # Excel temporary files
 ~$*.xlsx
@@ -18,22 +23,31 @@ Thumbs.db
 
 # VS Code
 .vscode/
+!.vscode/extensions.json
 
 # =========================================
-# Node.js & Next.js (splitdine_server + frontend)
+# Node.js & Frontend (Vite/React)
 node_modules/
+logs/
+dist/
+dist-ssr/
+.cache/
+.next/
+out/
+*.local
+
+# Environment variables
 .env
 .env.local
 .env.production
 .env.development
-dist/
-.cache/
-.next/
-out/
+
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
 # =========================================
 # Flutter (splitdine_flutter)
