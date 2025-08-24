@@ -1,471 +1,475 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router-dom';
+import { CheckIcon } from '@heroicons/react/20/solid';
 
-const Landing = () => {
+export default function Landing() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="bg-white">
       {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-primary-900">LMS Local</h1>
-              <span className="ml-2 text-sm text-gray-500">Last Man Standing</span>
-            </div>
-            <div className="flex items-center space-x-4">
+      <header className="absolute inset-x-0 top-0 z-50">
+        <nav className="flex items-center justify-between p-6 lg:px-8">
+          <div className="flex lg:flex-1">
+            <span className="text-2xl font-bold text-blue-600">LMSLocal</span>
+          </div>
+          <div className="hidden lg:flex lg:gap-x-12">
+            <a href="#features" className="text-sm font-semibold leading-6 text-gray-900 hover:text-blue-600">
+              Features
+            </a>
+            <a href="#pricing" className="text-sm font-semibold leading-6 text-gray-900 hover:text-blue-600">
+              Pricing
+            </a>
+            <a href="#how-it-works" className="text-sm font-semibold leading-6 text-gray-900 hover:text-blue-600">
+              How It Works
+            </a>
+          </div>
+          <div className="flex lg:flex-1 lg:justify-end gap-x-4">
+            <Link to="/login" className="text-sm font-semibold leading-6 text-gray-900 hover:text-blue-600">
+              Sign In
+            </Link>
+            <Link
+              to="/register"
+              className="rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+            >
+              Start Free Trial
+            </Link>
+          </div>
+        </nav>
+      </header>
+
+      {/* Hero Section */}
+      <div className="relative isolate px-6 pt-14 lg:px-8">
+        <div className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80">
+          <div className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-blue-600 to-purple-600 opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"></div>
+        </div>
+        
+        <div className="mx-auto max-w-4xl py-32 sm:py-48 lg:py-56">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
+              Stop Wrestling with <span className="text-blue-600">Last Man Standing</span> Admin
+            </h1>
+            <p className="mt-6 text-lg leading-8 text-gray-600 max-w-3xl mx-auto">
+              The admin-first platform that makes running profitable Last Man Standing competitions 
+              effortless for pub landlords, workplace organizers, and club managers. 
+              <strong className="text-gray-900">5-minute setup. Zero headaches. More revenue.</strong>
+            </p>
+            
+            <div className="mt-10 flex items-center justify-center gap-x-6">
               <Link
-                to="/login"
-                className="btn-primary"
+                to="/register"
+                className="rounded-md bg-blue-600 px-6 py-3 text-lg font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
               >
-                Login
+                Start Free - Under 5 Players
+              </Link>
+              <a href="#how-it-works" className="text-lg font-semibold leading-6 text-gray-900 hover:text-blue-600">
+                See How It Works <span aria-hidden="true">→</span>
+              </a>
+            </div>
+
+            <div className="mt-8 flex items-center justify-center gap-x-8 text-sm text-gray-500">
+              <div className="flex items-center gap-x-2">
+                <CheckIcon className="h-5 w-5 text-green-500" />
+                <span>Free for competitions with 5 or fewer players</span>
+              </div>
+              <div className="flex items-center gap-x-2">
+                <CheckIcon className="h-5 w-5 text-green-500" />
+                <span>5-minute setup wizard</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pain Points Section */}
+      <div className="py-24 sm:py-32 bg-gray-50">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              Tired of Competition Admin Chaos?
+            </h2>
+            <p className="mt-6 text-lg leading-8 text-gray-600">
+              You know the drill. Endless WhatsApp messages, spreadsheet nightmares, and constant "who's picked?" questions. 
+              There's got to be a better way.
+            </p>
+          </div>
+          
+          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
+            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
+              <div className="flex flex-col">
+                <dt className="text-base font-semibold leading-7 text-gray-900">
+                  😤 "Has everyone picked yet?"
+                </dt>
+                <dd className="mt-1 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                  <p className="flex-auto">Constantly chasing players for their picks. Checking who's in, who's out, who forgot to pick.</p>
+                </dd>
+              </div>
+              <div className="flex flex-col">
+                <dt className="text-base font-semibold leading-7 text-gray-900">
+                  📊 Spreadsheet Hell
+                </dt>
+                <dd className="mt-1 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                  <p className="flex-auto">Managing results in Excel, calculating eliminations manually, and dealing with disputes over "what did I pick?"</p>
+                </dd>
+              </div>
+              <div className="flex flex-col">
+                <dt className="text-base font-semibold leading-7 text-gray-900">
+                  💸 Lost Revenue
+                </dt>
+                <dd className="mt-1 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                  <p className="flex-auto">Competitions fizzle out mid-season. Players lose interest. You're working harder but making less.</p>
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      {/* Features Section */}
+      <div id="features" className="py-24 sm:py-32">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              Built for Busy Organizers
+            </h2>
+            <p className="mt-6 text-lg leading-8 text-gray-600">
+              Every feature designed to reduce your workload while keeping players engaged and coming back.
+            </p>
+          </div>
+          
+          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
+            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-2">
+              <div className="flex flex-col">
+                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                  <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                    <span className="text-white font-bold">5m</span>
+                  </div>
+                  5-Minute Setup Wizard
+                </dt>
+                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                  <p className="flex-auto">Competition name, team list, basic rules. Done. No complex configuration or tech headaches.</p>
+                </dd>
+              </div>
+              
+              <div className="flex flex-col">
+                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                  <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-green-600">
+                    <span className="text-white font-bold">📱</span>
+                  </div>
+                  Manage Players Without Tech Stress
+                </dt>
+                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                  <p className="flex-auto">Add players with just a name. Perfect for pub customers who don't have smartphones or email.</p>
+                </dd>
+              </div>
+              
+              <div className="flex flex-col">
+                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                  <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-purple-600">
+                    <span className="text-white font-bold">⚡</span>
+                  </div>
+                  Real-Time Status Dashboard
+                </dt>
+                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                  <p className="flex-auto">See who's picked, who hasn't, and when picks lock. No more "has everyone picked yet?" questions.</p>
+                </dd>
+              </div>
+              
+              <div className="flex flex-col">
+                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                  <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-orange-600">
+                    <span className="text-white font-bold">🔄</span>
+                  </div>
+                  Clone & Restart Magic
+                </dt>
+                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                  <p className="flex-auto">Finished competition? One click to start the next season with the same players and settings.</p>
+                </dd>
+              </div>
+              
+              <div className="flex flex-col">
+                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                  <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-red-600">
+                    <span className="text-white font-bold">🛡️</span>
+                  </div>
+                  Admin Override Powers
+                </dt>
+                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                  <p className="flex-auto">Complete audit trail and override powers for handling disputes. You're in control, always.</p>
+                </dd>
+              </div>
+              
+              <div className="flex flex-col">
+                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                  <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-indigo-600">
+                    <span className="text-white font-bold">📤</span>
+                  </div>
+                  One-Click Invitations
+                </dt>
+                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                  <p className="flex-auto">Share a link or code. Players can join instantly. Bulk email invites for workplace competitions.</p>
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      {/* Pricing Section */}
+      <div id="pricing" className="py-24 sm:py-32 bg-gray-50">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              Simple Pricing That Works
+            </h2>
+            <p className="mt-6 text-lg leading-8 text-gray-600">
+              Start free with small competitions. Scale up when you're ready.
+            </p>
+          </div>
+          
+          <div className="mx-auto mt-16 grid max-w-lg grid-cols-1 items-center gap-y-6 sm:mt-20 sm:gap-y-0 lg:max-w-4xl lg:grid-cols-3">
+            {/* Free Tier */}
+            <div className="rounded-3xl rounded-t-3xl bg-white/60 p-8 ring-1 ring-gray-900/10 sm:mx-8 sm:rounded-b-none sm:p-10 lg:mx-0 lg:rounded-bl-3xl lg:rounded-tr-none">
+              <h3 className="text-base font-semibold leading-7 text-blue-600">Free</h3>
+              <p className="mt-4 flex items-baseline gap-x-2">
+                <span className="text-5xl font-bold tracking-tight text-gray-900">£0</span>
+                <span className="text-base text-gray-500">per competition</span>
+              </p>
+              <p className="mt-6 text-base leading-7 text-gray-600">Perfect for testing the waters with small groups.</p>
+              <ul className="mt-8 space-y-3 text-sm leading-6 text-gray-600">
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-600" />
+                  Up to 5 players
+                </li>
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-600" />
+                  All core features
+                </li>
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-600" />
+                  Email support
+                </li>
+              </ul>
+              <Link
+                to="/register"
+                className="mt-8 block rounded-md bg-blue-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+              >
+                Start Free
+              </Link>
+            </div>
+            
+            {/* Per Competition */}
+            <div className="relative rounded-3xl bg-gray-900 p-8 shadow-2xl ring-1 ring-gray-900/10 sm:p-10">
+              <h3 className="text-base font-semibold leading-7 text-gray-300">Per Competition</h3>
+              <p className="mt-4 flex items-baseline gap-x-2">
+                <span className="text-5xl font-bold tracking-tight text-white">£39</span>
+                <span className="text-base text-gray-300">per competition</span>
+              </p>
+              <p className="mt-6 text-base leading-7 text-gray-300">Great for one-off events or seasonal competitions.</p>
+              <ul className="mt-8 space-y-3 text-sm leading-6 text-gray-300">
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-400" />
+                  Unlimited players
+                </li>
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-400" />
+                  All features included
+                </li>
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-400" />
+                  Priority support
+                </li>
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-400" />
+                  Custom branding
+                </li>
+              </ul>
+              <Link
+                to="/register"
+                className="mt-8 block rounded-md bg-white px-3.5 py-2.5 text-center text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-100"
+              >
+                Get Started
+              </Link>
+            </div>
+            
+            {/* Monthly */}
+            <div className="rounded-3xl rounded-b-3xl bg-white/60 p-8 ring-1 ring-gray-900/10 sm:mx-8 sm:rounded-t-none sm:p-10 lg:mx-0 lg:rounded-br-3xl lg:rounded-tl-none">
+              <h3 className="text-base font-semibold leading-7 text-blue-600">Monthly</h3>
+              <p className="mt-4 flex items-baseline gap-x-2">
+                <span className="text-5xl font-bold tracking-tight text-gray-900">£19</span>
+                <span className="text-base text-gray-500">per month</span>
+              </p>
+              <p className="mt-6 text-base leading-7 text-gray-600">Best for venues running multiple competitions.</p>
+              <ul className="mt-8 space-y-3 text-sm leading-6 text-gray-600">
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-600" />
+                  Unlimited competitions
+                </li>
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-600" />
+                  Unlimited players
+                </li>
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-600" />
+                  Advanced analytics
+                </li>
+                <li className="flex gap-x-3">
+                  <CheckIcon className="h-6 w-5 flex-none text-blue-600" />
+                  Phone support
+                </li>
+              </ul>
+              <Link
+                to="/register"
+                className="mt-8 block rounded-md bg-blue-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+              >
+                Start Monthly
               </Link>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-50 to-primary-100 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Hero Content */}
-            <div>
-              <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 mb-6">
-                Run Last Man Standing
-                <span className="text-primary-600 block">Effortlessly</span>
-              </h1>
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                The admin-first platform for pub landlords, workplace organisers, and club managers. 
-                Set up competitions in 5 minutes, manage all players, and handle the complexity behind the scenes.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/register" className="btn-primary text-lg px-8 py-4">
-                  Start Free Competition
-                </Link>
-                <button className="btn-secondary text-lg px-8 py-4">
-                  See How It Works
-                </button>
-              </div>
-              <p className="text-sm text-gray-500 mt-4">
-                ✅ Free for competitions with 5 or fewer players
-              </p>
-            </div>
-            
-            {/* Hero Visual */}
-            <div className="relative">
-              <div className="bg-white rounded-2xl shadow-xl p-6 transform rotate-2">
-                <div className="bg-gradient-to-r from-green-400 to-green-600 rounded-lg p-4 mb-4">
-                  <div className="text-white font-semibold">Premier League LMS</div>
-                  <div className="text-green-100 text-sm">Round 5 of 38 • 24 players left</div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                    <span className="text-sm">Mike Johnson</span>
-                    <span className="text-xs text-green-600 font-medium">✓ Picked</span>
-                  </div>
-                  <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                    <span className="text-sm">Sarah Wilson</span>
-                    <span className="text-xs text-green-600 font-medium">✓ Picked</span>
-                  </div>
-                  <div className="flex justify-between items-center p-2 bg-yellow-50 rounded">
-                    <span className="text-sm">Dave Smith</span>
-                    <span className="text-xs text-yellow-600 font-medium">⏳ Pending</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Key Benefits */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-              Everything You Need to Run Competitions
+      {/* Social Proof */}
+      <div className="py-24 sm:py-32">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              Trusted by Organizers Everywhere
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Focus on your business while we handle all the complexity behind the scenes
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">5-Minute Setup</h3>
-              <p className="text-gray-600">
-                Our setup wizard gets competitions running immediately. No technical knowledge required.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Manage Any Player</h3>
-              <p className="text-gray-600">
-                Handle customers without smartphones or email. Add players manually and manage picks on their behalf.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Complete Control</h3>
-              <p className="text-gray-600">
-                Full audit trail and override powers for handling disputes. Adjust results with mandatory notes.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Easy Invites</h3>
-              <p className="text-gray-600">
-                One-click invitation sharing, bulk email invites, and simple join codes for players.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Real-Time Dashboard</h3>
-              <p className="text-gray-600">
-                Live status updates reduce "who's picked?" questions. See everything at a glance.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Clone & Restart</h3>
-              <p className="text-gray-600">
-                Running repeat competitions is effortless. Clone previous setups and start new seasons quickly.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-              How Last Man Standing Works
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              A simple elimination game that keeps your customers engaged week after week
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <div className="space-y-8">
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold">
-                    1
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Players Pick Teams</h3>
-                    <p className="text-gray-600">Each round, every player chooses exactly one team to win. No same team twice!</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold">
-                    2
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Picks Lock Before Kickoff</h3>
-                    <p className="text-gray-600">Picks close 1 hour before matches start, or when all players have chosen.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold">
-                    3
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Winners Survive, Losers Go Home</h3>
-                    <p className="text-gray-600">If your team wins, you progress. Draw or lose? You're eliminated immediately.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold">
-                    4
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Last Player Standing Wins</h3>
-                    <p className="text-gray-600">Competition continues until only one player remains - the Last Man Standing!</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 rounded-2xl p-8">
-              <div className="space-y-4">
-                <div className="bg-white rounded-lg p-4 border-l-4 border-green-500">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Round 1: 32 Players</span>
-                    <span className="text-sm text-green-600">All Active</span>
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border-l-4 border-green-500">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Round 2: 24 Players</span>
-                    <span className="text-sm text-gray-500">8 Eliminated</span>
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border-l-4 border-yellow-500">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Round 3: 15 Players</span>
-                    <span className="text-sm text-gray-500">9 Eliminated</span>
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border-l-4 border-orange-500">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Round 4: 8 Players</span>
-                    <span className="text-sm text-gray-500">7 Eliminated</span>
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border-l-4 border-red-500">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Round 5: 1 Winner! 🏆</span>
-                    <span className="text-sm text-red-600">7 Eliminated</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              No hidden fees. Start free and only pay when you need more features.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Free Tier */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200">
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Free</h3>
-                <div className="text-4xl font-bold text-gray-900 mb-4">
-                  £0
-                  <span className="text-lg text-gray-500 font-normal">/competition</span>
-                </div>
-                <p className="text-gray-600 mb-6">Perfect for small competitions</p>
-                
-                <div className="space-y-3 mb-8">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Up to 5 players</span>
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Basic competition management</span>
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Email support</span>
-                  </div>
-                </div>
-                
-                <Link to="/register" className="w-full btn-secondary">
-                  Start Free
-                </Link>
-              </div>
-            </div>
-
-            {/* Per Competition */}
-            <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-primary-500 relative">
-              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                <span className="bg-primary-600 text-white px-4 py-1 text-sm font-medium rounded-full">Most Popular</span>
-              </div>
-              
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Per Competition</h3>
-                <div className="text-4xl font-bold text-gray-900 mb-4">
-                  £39
-                  <span className="text-lg text-gray-500 font-normal">/competition</span>
-                </div>
-                <p className="text-gray-600 mb-6">Pay as you go</p>
-                
-                <div className="space-y-3 mb-8">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Unlimited players</span>
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Advanced player management</span>
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Clone & restart competitions</span>
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Priority support</span>
-                  </div>
-                </div>
-                
-                <Link to="/register" className="w-full btn-primary">
-                  Get Started
-                </Link>
-              </div>
-            </div>
-
-            {/* Monthly */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-gray-200">
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Monthly</h3>
-                <div className="text-4xl font-bold text-gray-900 mb-4">
-                  £19
-                  <span className="text-lg text-gray-500 font-normal">/month</span>
-                </div>
-                <p className="text-gray-600 mb-6">For regular organisers</p>
-                
-                <div className="space-y-3 mb-8">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Unlimited competitions</span>
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Unlimited players</span>
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Advanced analytics</span>
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-700">Priority support</span>
-                  </div>
-                </div>
-                
-                <Link to="/register" className="w-full btn-secondary">
-                  Start Monthly
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <p className="text-center text-gray-600 mt-8">
-            All plans include our complete admin toolkit and player management system
-          </p>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-primary-600">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-            Ready to Get Started?
-          </h2>
-          <p className="text-xl text-primary-100 mb-8">
-            Join hundreds of pub landlords and organisers running successful competitions
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/register" className="bg-white text-primary-600 font-bold py-4 px-8 rounded-xl hover:bg-gray-50 transition-colors">
-              Start Your First Competition
-            </Link>
-            <Link to="/login" className="border-2 border-white text-white font-bold py-4 px-8 rounded-xl hover:bg-primary-700 transition-colors">
-              Login to Dashboard
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="md:col-span-2">
-              <h3 className="text-2xl font-bold mb-4">LMS Local</h3>
-              <p className="text-gray-400 mb-4">
-                The admin-first platform for running Last Man Standing competitions. 
-                Built for pub landlords, workplace organisers, and club managers.
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Product</h4>
-              <div className="space-y-2">
-                <div className="text-gray-400">Features</div>
-                <div className="text-gray-400">Pricing</div>
-                <div className="text-gray-400">How it works</div>
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Support</h4>
-              <div className="space-y-2">
-                <div className="text-gray-400">Help Center</div>
-                <div className="text-gray-400">Contact Us</div>
-                <div className="text-gray-400">Terms & Privacy</div>
-              </div>
-            </div>
           </div>
           
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 LMS Local. All rights reserved.</p>
+          <div className="mx-auto mt-16 flow-root max-w-2xl sm:mt-20 lg:mx-0 lg:max-w-none">
+            <div className="-mt-8 sm:-mx-4 sm:columns-2 sm:text-[0] lg:columns-3">
+              <div className="pt-8 sm:inline-block sm:w-full sm:px-4">
+                <figure className="rounded-2xl bg-gray-50 p-8 text-sm leading-6">
+                  <blockquote className="text-gray-900">
+                    <p>"Finally! No more chasing people on WhatsApp. Everything's automated and my punters love how easy it is to join."</p>
+                  </blockquote>
+                  <figcaption className="mt-6 flex items-center gap-x-4">
+                    <div className="h-10 w-10 rounded-full bg-gray-50 flex items-center justify-center">
+                      <span className="text-sm font-semibold">MJ</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">Mark Johnson</div>
+                      <div className="text-gray-600">The Red Lion, Manchester</div>
+                    </div>
+                  </figcaption>
+                </figure>
+              </div>
+              
+              <div className="pt-8 sm:inline-block sm:w-full sm:px-4">
+                <figure className="rounded-2xl bg-gray-50 p-8 text-sm leading-6">
+                  <blockquote className="text-gray-900">
+                    <p>"Set up our office competition in minutes. The clone feature means I'll never have to start from scratch again."</p>
+                  </blockquote>
+                  <figcaption className="mt-6 flex items-center gap-x-4">
+                    <div className="h-10 w-10 rounded-full bg-gray-50 flex items-center justify-center">
+                      <span className="text-sm font-semibold">SP</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">Sarah Phillips</div>
+                      <div className="text-gray-600">HR Manager, TechCorp</div>
+                    </div>
+                  </figcaption>
+                </figure>
+              </div>
+              
+              <div className="pt-8 sm:inline-block sm:w-full sm:px-4">
+                <figure className="rounded-2xl bg-gray-50 p-8 text-sm leading-6">
+                  <blockquote className="text-gray-900">
+                    <p>"Tripled our participation rates. The real-time dashboard keeps everyone engaged all season long."</p>
+                  </blockquote>
+                  <figcaption className="mt-6 flex items-center gap-x-4">
+                    <div className="h-10 w-10 rounded-full bg-gray-50 flex items-center justify-center">
+                      <span className="text-sm font-semibold">DT</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">Dave Thompson</div>
+                      <div className="text-gray-600">Sports Club Secretary</div>
+                    </div>
+                  </figcaption>
+                </figure>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* How It Works */}
+      <div id="how-it-works" className="py-24 sm:py-32 bg-gray-50">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              From Chaos to Competition in 5 Minutes
+            </h2>
+          </div>
+          
+          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
+            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-10 lg:max-w-none lg:grid-cols-4">
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-lg bg-blue-600 text-2xl font-bold text-white">1</div>
+                <dt className="text-base font-semibold leading-7 text-gray-900 mb-2">Quick Setup</dt>
+                <dd className="text-sm leading-6 text-gray-600">Competition name, team list, basic rules. Our wizard guides you through everything.</dd>
+              </div>
+              
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-lg bg-green-600 text-2xl font-bold text-white">2</div>
+                <dt className="text-base font-semibold leading-7 text-gray-900 mb-2">Invite Players</dt>
+                <dd className="text-sm leading-6 text-gray-600">Share a link or code. Add players manually. Bulk email for workplace competitions.</dd>
+              </div>
+              
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-lg bg-purple-600 text-2xl font-bold text-white">3</div>
+                <dt className="text-base font-semibold leading-7 text-gray-900 mb-2">Monitor & Manage</dt>
+                <dd className="text-sm leading-6 text-gray-600">Real-time dashboard shows picks, results, and eliminations. Override anything when needed.</dd>
+              </div>
+              
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-lg bg-orange-600 text-2xl font-bold text-white">4</div>
+                <dt className="text-base font-semibold leading-7 text-gray-900 mb-2">Clone & Repeat</dt>
+                <dd className="text-sm leading-6 text-gray-600">Finished? One click to start the next season. Same players, same settings, zero setup time.</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      {/* Final CTA */}
+      <div className="bg-blue-600">
+        <div className="px-6 py-24 sm:px-6 sm:py-32 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Ready to End Competition Admin Hell?
+            </h2>
+            <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-blue-100">
+              Join hundreds of organizers who've discovered the secret to effortless Last Man Standing competitions.
+              Start free with competitions under 5 players.
+            </p>
+            <div className="mt-10 flex items-center justify-center gap-x-6">
+              <Link
+                to="/register"
+                className="rounded-md bg-white px-6 py-3 text-lg font-semibold text-blue-600 shadow-sm hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Start Free Trial
+              </Link>
+              <Link to="/login" className="text-lg font-semibold leading-6 text-white hover:text-blue-100">
+                Already have an account? <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-12 md:flex md:items-center md:justify-between lg:px-8">
+          <div className="flex justify-center space-x-6 md:order-2">
+            <span className="text-sm leading-5 text-gray-500">
+              © 2024 LMSLocal. Making competitions effortless.
+            </span>
+          </div>
+          <div className="mt-8 md:order-1 md:mt-0">
+            <span className="text-2xl font-bold text-blue-600">LMSLocal</span>
           </div>
         </div>
       </footer>
     </div>
-  )
+  );
 }
-
-export default Landing

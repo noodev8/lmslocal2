@@ -1,156 +1,127 @@
-import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
-const Login = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  })
-  const [errors, setErrors] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [generalError, setGeneralError] = useState('')
-
-  const { login } = useAuth()
-  const navigate = useNavigate()
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }))
-    }
-    if (generalError) {
-      setGeneralError('')
-    }
-  }
-
-  const validateForm = () => {
-    const newErrors = {}
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address'
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
 
-    setLoading(true)
-    
-    const result = await login(formData.email, formData.password)
-    
-    if (result.success) {
-      navigate('/dashboard')
-    } else {
-      setGeneralError(result.error)
+    try {
+      // TODO: Replace with actual API call when authentication is ready
+      console.log('Login attempt:', { email, password });
+      
+      // Mock successful login for now
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Store mock user data
+      localStorage.setItem('user', JSON.stringify({
+        email,
+        name: 'Demo User',
+        token: 'mock-token-' + Date.now()
+      }));
+      
+      navigate('/dashboard');
+    } catch (err) {
+      setError('Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setLoading(false)
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary-50 to-primary-100">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-primary-900 mb-2">LMS Local</h1>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Welcome Back</h2>
-          <p className="text-gray-600">Sign in to your account</p>
-        </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <h2 className="text-center text-3xl font-bold text-gray-900">
+          Sign in to LMSLocal
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          Or{' '}
+          <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
+            create a new account
+          </Link>
+        </p>
+      </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {generalError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-red-700 text-sm">{generalError}</p>
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
+                {error}
               </div>
             )}
-
+            
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email address
               </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                className={`input-field ${errors.email ? 'border-red-300 focus:ring-red-500' : ''}`}
-                placeholder="Enter your email"
-              />
-              {errors.email && <p className="form-error">{errors.email}</p>}
+              <div className="mt-1">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter your email"
+                />
+              </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                className={`input-field ${errors.password ? 'border-red-300 focus:ring-red-500' : ''}`}
-                placeholder="Enter your password"
-              />
-              {errors.password && <p className="form-error">{errors.password}</p>}
+              <div className="mt-1">
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter your password"
+                />
+              </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full btn-primary py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Signing In...
-                </>
-              ) : (
-                'Sign In'
-              )}
-            </button>
+            <div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {isLoading ? 'Signing in...' : 'Sign in'}
+              </button>
+            </div>
 
-            <div className="text-center space-y-2">
-              <Link to="/forgot-password" className="text-primary-600 hover:text-primary-700 font-medium">
+            <div className="text-center">
+              <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
                 Forgot your password?
               </Link>
-              <p className="text-gray-600">
-                Don't have an account?{' '}
-                <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                  Sign up
-                </Link>
-              </p>
             </div>
           </form>
+
+          <div className="mt-6">
+            <div className="text-center">
+              <Link to="/" className="text-sm text-gray-600 hover:text-gray-500">
+                ← Back to home
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
-
-export default Login

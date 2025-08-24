@@ -1,0 +1,100 @@
+/*
+=======================================================================================================================================
+My Competitions Route - Get competitions user is involved in
+=======================================================================================================================================
+Purpose: Retrieve competitions where user is organiser or participant
+=======================================================================================================================================
+*/
+
+const express = require('express');
+const { Pool } = require('pg');
+const verifyToken = require('../middleware/verifyToken');
+const router = express.Router();
+
+// Database connection
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
+
+
+/*
+=======================================================================================================================================
+API Route: /mycompetitions
+=======================================================================================================================================
+Method: POST
+Purpose: Get competitions where user is organiser or participant
+=======================================================================================================================================
+Success Response:
+{
+  "return_code": "SUCCESS",
+  "competitions": [
+    {
+      "id": 123,
+      "name": "Premier League LMS 2025",
+      "status": "UNLOCKED",
+      "player_count": 12,
+      "team_list_name": "Premier League 2025-26",
+      "is_organiser": true,
+      "invite_code": "1.4567"
+    }
+  ]
+}
+=======================================================================================================================================
+*/
+router.post('/', verifyToken, async (req, res) => {
+  try {
+    const user_id = req.user.id;
+
+    const result = await pool.query(`
+      SELECT 
+        c.id,
+        c.name,
+        c.description,
+        c.status,
+        c.lives_per_player,
+        c.no_team_twice,
+        c.invite_code,
+        c.created_at,
+        tl.name as team_list_name,
+        COUNT(cu_all.user_id) as player_count,
+        c.organiser_id
+      FROM competition c
+      JOIN team_list tl ON c.team_list_id = tl.id
+      LEFT JOIN competition_user cu_all ON c.id = cu_all.competition_id
+      LEFT JOIN competition_user cu_player ON c.id = cu_player.competition_id AND cu_player.user_id = $1
+      WHERE (c.organiser_id = $1 OR cu_player.user_id = $1)
+      GROUP BY c.id, c.name, c.description, c.status, c.lives_per_player, c.no_team_twice, c.invite_code, c.created_at, tl.name, c.organiser_id
+      ORDER BY c.created_at DESC
+    `, [user_id]);
+
+    res.json({
+      return_code: "SUCCESS",
+      competitions: result.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        status: row.status,
+        lives_per_player: row.lives_per_player,
+        no_team_twice: row.no_team_twice,
+        invite_code: row.invite_code,
+        team_list_name: row.team_list_name,
+        player_count: parseInt(row.player_count),
+        created_at: row.created_at,
+        is_organiser: row.organiser_id === user_id
+      }))
+    });
+
+  } catch (error) {
+    console.error('Get my competitions error:', error);
+    res.status(500).json({
+      return_code: "SERVER_ERROR",
+      message: "Internal server error"
+    });
+  }
+});
+
+module.exports = router;

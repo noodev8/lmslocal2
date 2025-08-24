@@ -8,6 +8,10 @@ Thumbs.db
 *.tmp
 *.lock
 
+# Excel temporary files
+~$*.xlsx
+~$*.xls
+
 # IntelliJ / Android Studio
 .idea/
 *.iml

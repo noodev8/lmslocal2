@@ -15,9 +15,22 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 // Import routes
-const healthRoute = require('./routes/health');
-const { router: authRoute } = require('./routes/auth');
-const competitionRoute = require('./routes/competition');
+const loginRoute = require('./routes/login');
+const registerRoute = require('./routes/register');
+const updateProfileRoute = require('./routes/update-profile');
+const forgotPasswordRoute = require('./routes/forgot-password');
+const resetPasswordRoute = require('./routes/reset-password');
+const verifyEmailRoute = require('./routes/verify-email');
+const resendVerificationRoute = require('./routes/resend-verification');
+const mycompetitionsRoute = require('./routes/mycompetitions');
+const createCompetitionRoute = require('./routes/create-competition');
+const createRoundRoute = require('./routes/create-round');
+const addFixtureRoute = require('./routes/add-fixture');
+const setFixtureResultRoute = require('./routes/set-fixture-result');
+const lockUnlockRoundRoute = require('./routes/lock-unlock-round');
+const deleteFixtureRoute = require('./routes/delete-fixture');
+const setPickRoute = require('./routes/set-pick');
+const calculateResultsRoute = require('./routes/calculate-results');
 
 const app = express();
 const PORT = process.env.PORT || 3015;
@@ -39,7 +52,7 @@ app.use(helmet({
   },
 }));
 
-// Rate limiting
+// General rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
@@ -49,6 +62,22 @@ const limiter = rateLimit({
   }
 });
 app.use(limiter);
+
+// Aggressive rate limiting for database-heavy endpoints
+const dbIntensiveLimit = rateLimit({
+  windowMs: 10 * 1000, // 10 seconds
+  max: 5, // Max 5 requests per 10 seconds per IP
+  message: {
+    return_code: "RATE_LIMIT_EXCEEDED",
+    message: "Too many database requests. Please wait 10 seconds before trying again."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Rate limit by IP + endpoint to prevent rapid clicks on same endpoint
+    return `${req.ip}-${req.path}`;
+  }
+});
 
 // CORS configuration
 app.use(cors({
@@ -62,16 +91,26 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging middleware (disabled for cleaner output)
-// app.use((req, res, next) => {
-//   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-//   next();
-// });
+
+// Rate limiting will be applied within the competition router for specific endpoints
 
 // Routes
-app.use('/health', healthRoute);
-app.use('/auth', authRoute);
-app.use('/competitions', competitionRoute);
+app.use('/login', loginRoute);
+app.use('/register', registerRoute);
+app.use('/update-profile', updateProfileRoute);
+app.use('/forgot-password', forgotPasswordRoute);
+app.use('/reset-password', resetPasswordRoute);
+app.use('/verify-email', verifyEmailRoute);
+app.use('/resend-verification', resendVerificationRoute);
+app.use('/mycompetitions', mycompetitionsRoute);
+app.use('/create-competition', createCompetitionRoute);
+app.use('/create-round', createRoundRoute);
+app.use('/add-fixture', addFixtureRoute);
+app.use('/set-fixture-result', setFixtureResultRoute);
+app.use('/lock-unlock-round', lockUnlockRoundRoute);
+app.use('/delete-fixture', deleteFixtureRoute);
+app.use('/set-pick', setPickRoute);
+app.use('/calculate-results', calculateResultsRoute);
 
 // Default route for testing
 app.get('/', (req, res) => {
@@ -108,6 +147,41 @@ app.listen(PORT, () => {
   console.log(`Database: ${process.env.DB_NAME}@${process.env.DB_HOST}:${process.env.DB_PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`=======================================================================`);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit the process, just log the error
+});
+
+// Handle uncaught exceptions  
+process.on('uncaughtException', (error) => {
+  console.error('=== UNCAUGHT EXCEPTION ===');
+  console.error('Error:', error);
+  console.error('Stack:', error.stack);
+  console.error('Memory at crash:', process.memoryUsage());
+  console.error('========================');
+  // Log but don't exit in development
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+});
+
+// Handle process signals
+process.on('SIGTERM', () => {
+  console.log('=== SIGTERM received ===');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('=== SIGINT received ===');
+  process.exit(0);
+});
+
+// Handle exit
+process.on('exit', (code) => {
+  console.log(`=== Process exiting with code ${code} ===`);
 });
 
 module.exports = app;
