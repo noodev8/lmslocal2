@@ -42,6 +42,10 @@ const deleteFixtureRoute = require('./routes/delete-fixture');
 const setPickRoute = require('./routes/set-pick');
 const calculateResultsRoute = require('./routes/calculate-results');
 const joinCompetitionRoute = require('./routes/join-competition');
+const playerLoginRoute = require('./routes/player-login');
+const playerLoginGeneralRoute = require('./routes/player-login-general');
+const getUserCompetitionsRoute = require('./routes/get-user-competitions');
+const validateAccessCodeRoute = require('./routes/validate-access-code');
 
 const app = express();
 const PORT = process.env.PORT || 3015;
@@ -150,6 +154,10 @@ app.use('/delete-fixture', deleteFixtureRoute);
 app.use('/set-pick', setPickRoute);
 app.use('/calculate-results', calculateResultsRoute);
 app.use('/join-competition', joinCompetitionRoute);
+app.use('/player-login', playerLoginRoute);
+app.use('/player-login-general', playerLoginGeneralRoute);
+app.use('/get-user-competitions', getUserCompetitionsRoute);
+app.use('/validate-access-code', validateAccessCodeRoute);
 
 // Default route for testing
 app.get('/', (req, res) => {

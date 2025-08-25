@@ -276,7 +276,6 @@ const sendPlayerMagicLink = async (email, token, displayName, competitionName, s
       text: textContent,
     });
 
-    console.log('Player magic link email sent successfully:', result.id);
     return { success: true, messageId: result.id };
 
   } catch (error) {

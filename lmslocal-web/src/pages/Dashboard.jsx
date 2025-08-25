@@ -189,6 +189,28 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Player Mode Card */}
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg mb-6">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    🎮 Player Mode
+                  </h3>
+                  <p className="text-gray-600 text-sm">
+                    Switch to player view to participate in competitions and make your picks.
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate('/play')}
+                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors font-medium"
+                >
+                  Play Now
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             

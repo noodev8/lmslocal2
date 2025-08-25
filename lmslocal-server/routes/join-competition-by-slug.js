@@ -142,7 +142,6 @@ router.post('/', async (req, res) => {
 
     if (existingMemberResult.rows.length > 0) {
       // Already joined - still send magic link for login
-      console.log('User already joined competition, sending login link');
     } else {
       // Add to competition
       await pool.query(`
