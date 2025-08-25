@@ -1,0 +1,208 @@
+/*
+=======================================================================================================================================
+Join Competition by Slug Route - Player joins with magic link authentication
+=======================================================================================================================================
+*/
+
+const express = require('express');
+const { Pool } = require('pg');
+const { sendPlayerMagicLink } = require('../services/emailService');
+const { generateToken } = require('../utils/tokenUtils');
+const router = express.Router();
+
+// Database connection
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
+
+/*
+=======================================================================================================================================
+API Route: /join-competition-by-slug
+=======================================================================================================================================
+Method: POST
+Purpose: Player joins competition using slug + invite code, sends magic link email
+=======================================================================================================================================
+Request Payload:
+{
+  "slug": "10001",
+  "display_name": "John Smith",
+  "email": "john@email.com",
+  "invite_code": "ABC123"
+}
+
+Success Response:
+{
+  "return_code": "SUCCESS",
+  "message": "Magic link sent to your email. Check your inbox to complete joining!",
+  "email": "john@email.com"
+}
+=======================================================================================================================================
+*/
+router.post('/', async (req, res) => {
+  try {
+    const { slug, display_name, email, invite_code } = req.body;
+
+    // Basic validation
+    if (!slug || typeof slug !== 'string') {
+      return res.status(400).json({
+        return_code: "VALIDATION_ERROR",
+        message: "Slug is required and must be a string"
+      });
+    }
+
+    if (!display_name || typeof display_name !== 'string' || display_name.trim().length === 0) {
+      return res.status(400).json({
+        return_code: "VALIDATION_ERROR",
+        message: "Display name is required"
+      });
+    }
+
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({
+        return_code: "VALIDATION_ERROR",
+        message: "Valid email is required"
+      });
+    }
+
+    if (!invite_code || typeof invite_code !== 'string') {
+      return res.status(400).json({
+        return_code: "VALIDATION_ERROR",
+        message: "Invite code is required"
+      });
+    }
+
+    // Get competition by slug and validate invite code
+    const competitionResult = await pool.query(`
+      SELECT id, name, invite_code, status 
+      FROM competition 
+      WHERE slug = $1
+    `, [slug]);
+
+    if (competitionResult.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "COMPETITION_NOT_FOUND",
+        message: "Competition not found"
+      });
+    }
+
+    const competition = competitionResult.rows[0];
+
+    // Validate invite code
+    if (competition.invite_code !== invite_code.trim()) {
+      return res.status(400).json({
+        return_code: "INVALID_INVITE_CODE",
+        message: "Invalid invite code for this competition"
+      });
+    }
+
+    // Check if user already exists
+    let user;
+    const existingUserResult = await pool.query(
+      'SELECT id, display_name, email FROM app_user WHERE email = $1',
+      [email.toLowerCase().trim()]
+    );
+
+    if (existingUserResult.rows.length > 0) {
+      user = existingUserResult.rows[0];
+      
+      // Update display name if different
+      if (user.display_name !== display_name.trim()) {
+        await pool.query(
+          'UPDATE app_user SET display_name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          [display_name.trim(), user.id]
+        );
+      }
+    } else {
+      // Create new user (player account)
+      const newUserResult = await pool.query(`
+        INSERT INTO app_user (
+          email,
+          display_name,
+          is_managed,
+          email_verified,
+          created_at,
+          updated_at
+        )
+        VALUES ($1, $2, true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        RETURNING id, display_name, email
+      `, [email.toLowerCase().trim(), display_name.trim()]);
+      
+      user = newUserResult.rows[0];
+    }
+
+    // Check if already joined this competition
+    const existingMemberResult = await pool.query(`
+      SELECT id FROM competition_user 
+      WHERE competition_id = $1 AND user_id = $2
+    `, [competition.id, user.id]);
+
+    if (existingMemberResult.rows.length > 0) {
+      // Already joined - still send magic link for login
+      console.log('User already joined competition, sending login link');
+    } else {
+      // Add to competition
+      await pool.query(`
+        INSERT INTO competition_user (
+          competition_id,
+          user_id,
+          status,
+          lives_remaining,
+          joined_at
+        )
+        VALUES ($1, $2, 'active', (SELECT lives_per_player FROM competition WHERE id = $1), CURRENT_TIMESTAMP)
+      `, [competition.id, user.id]);
+
+      // Log the join action
+      await pool.query(`
+        INSERT INTO audit_log (competition_id, user_id, action, details)
+        VALUES ($1, $2, 'Player Joined', $3)
+      `, [
+        competition.id,
+        user.id,
+        `Player "${display_name}" (${email}) joined competition "${competition.name}"`
+      ]);
+    }
+
+    // Generate magic link token
+    const token = generateToken();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 30); // 30 minute expiry
+
+    // Store token in database
+    await pool.query(`
+      UPDATE app_user 
+      SET auth_token = $1, auth_token_expires = $2, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+    `, [token, expiresAt, user.id]);
+
+    // Send magic link email
+    try {
+      await sendPlayerMagicLink(email, token, display_name, competition.name, slug);
+    } catch (emailError) {
+      console.error('Failed to send magic link email:', emailError);
+      return res.status(500).json({
+        return_code: "EMAIL_ERROR",
+        message: "Failed to send magic link email. Please try again."
+      });
+    }
+
+    res.json({
+      return_code: "SUCCESS",
+      message: "Magic link sent to your email. Check your inbox to complete joining!",
+      email: email
+    });
+
+  } catch (error) {
+    console.error('Join competition by slug error:', error);
+    res.status(500).json({
+      return_code: "SERVER_ERROR",
+      message: "Internal server error"
+    });
+  }
+});
+
+module.exports = router;

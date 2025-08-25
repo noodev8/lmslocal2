@@ -186,7 +186,107 @@ const sendPasswordResetEmail = async (email, token, displayName) => {
   }
 };
 
+/**
+ * Sends a magic link email for player authentication
+ * @param {string} email - Recipient email address
+ * @param {string} token - Magic link token
+ * @param {string} displayName - Player's display name
+ * @param {string} competitionName - Competition name
+ * @param {string} slug - Competition slug
+ * @returns {Object} Result object with success status
+ */
+const sendPlayerMagicLink = async (email, token, displayName, competitionName, slug) => {
+  try {
+    const magicLinkUrl = `${process.env.PLAYER_FRONTEND_URL}/play/${slug}?token=${token}`;
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Join ${competitionName} - LMS Local</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">Welcome to ${competitionName}!</h1>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+            <h2 style="color: #343a40; margin-top: 0;">Hi ${displayName}! 👋</h2>
+            
+            <p style="font-size: 16px; margin-bottom: 25px;">
+              You're ready to join <strong>${competitionName}</strong> and test your football knowledge!
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${magicLinkUrl}" 
+                 style="background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-size: 16px;">
+                🚀 Join Competition Now
+              </a>
+            </div>
+            
+            <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0;">
+              <h3 style="color: #1976d2; margin-top: 0; font-size: 16px;">What happens next?</h3>
+              <ul style="color: #424242; margin: 0; padding-left: 20px;">
+                <li>Click the button above to access your competition dashboard</li>
+                <li>Make your picks for each round</li>
+                <li>Track your progress and see results</li>
+                <li>Compete against other players!</li>
+              </ul>
+            </div>
+            
+            <p style="font-size: 14px; color: #6c757d; border-top: 1px solid #dee2e6; padding-top: 20px; margin-top: 30px;">
+              This magic link will expire in 30 minutes for security. If you didn't request to join this competition, you can safely ignore this email.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #6c757d;">
+            <p>LMS Local - Admin-first Last Man Standing competitions</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const textContent = `
+      Welcome to ${competitionName}!
+      
+      Hi ${displayName},
+      
+      You're ready to join ${competitionName} and test your football knowledge!
+      
+      Click this link to join: ${magicLinkUrl}
+      
+      What happens next?
+      - Make your picks for each round
+      - Track your progress and see results  
+      - Compete against other players!
+      
+      This magic link will expire in 30 minutes for security.
+      
+      ---
+      LMS Local - Admin-first Last Man Standing competitions
+    `;
+
+    const result = await resend.emails.send({
+      from: `${process.env.EMAIL_NAME} <${process.env.EMAIL_FROM}>`,
+      to: [email],
+      subject: `Join ${competitionName} - LMS Local`,
+      html: htmlContent,
+      text: textContent,
+    });
+
+    console.log('Player magic link email sent successfully:', result.id);
+    return { success: true, messageId: result.id };
+
+  } catch (error) {
+    console.error('Failed to send player magic link email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendVerificationEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendPlayerMagicLink
 };

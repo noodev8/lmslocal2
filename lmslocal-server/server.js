@@ -34,6 +34,10 @@ const modifyFixtureRoute = require('./routes/modify-fixture');
 const setFixtureResultRoute = require('./routes/set-fixture-result');
 // const lockUnlockRoundRoute = require('./routes/lock-unlock-round'); // DISABLED: Round status removed
 const lockUnlockCompetitionRoute = require('./routes/lock-unlock-competition');
+const getCompetitionBySlugRoute = require('./routes/get-competition-by-slug');
+const joinCompetitionBySlugRoute = require('./routes/join-competition-by-slug');
+const verifyPlayerTokenRoute = require('./routes/verify-player-token');
+const getPlayerCurrentRoundRoute = require('./routes/get-player-current-round');
 const deleteFixtureRoute = require('./routes/delete-fixture');
 const setPickRoute = require('./routes/set-pick');
 const calculateResultsRoute = require('./routes/calculate-results');
@@ -138,6 +142,10 @@ app.use('/modify-fixture', modifyFixtureRoute);
 app.use('/set-fixture-result', setFixtureResultRoute);
 // app.use('/lock-unlock-round', lockUnlockRoundRoute); // DISABLED: Round status removed
 app.use('/lock-unlock-competition', lockUnlockCompetitionRoute);
+app.use('/get-competition-by-slug', getCompetitionBySlugRoute);
+app.use('/join-competition-by-slug', joinCompetitionBySlugRoute);
+app.use('/verify-player-token', verifyPlayerTokenRoute);
+app.use('/get-player-current-round', getPlayerCurrentRoundRoute);
 app.use('/delete-fixture', deleteFixtureRoute);
 app.use('/set-pick', setPickRoute);
 app.use('/calculate-results', calculateResultsRoute);

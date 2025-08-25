@@ -264,6 +264,21 @@ export default function Competition() {
                       <dt className="text-sm font-medium text-gray-500">Invite Code</dt>
                       <dd className="text-sm text-gray-900 font-mono">{competition.invite_code}</dd>
                     </div>
+                    {competition.slug && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Player URL</dt>
+                        <dd className="text-sm text-gray-900">
+                          <a 
+                            href={`${window.location.origin}/play/${competition.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 font-mono"
+                          >
+                            lmslocal.com/play/{competition.slug}
+                          </a>
+                        </dd>
+                      </div>
+                    )}
                   </dl>
                 </div>
               </div>

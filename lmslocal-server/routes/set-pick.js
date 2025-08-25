@@ -18,8 +18,8 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
 });
 
-// Middleware to verify JWT token
-const verifyToken = async (req, res, next) => {
+// Middleware to verify player JWT token
+const verifyPlayerToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -33,7 +33,7 @@ const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.user_id || decoded.userId]);
+    const result = await pool.query('SELECT id, email, display_name FROM app_user WHERE id = $1', [decoded.user_id]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -42,6 +42,8 @@ const verifyToken = async (req, res, next) => {
     }
 
     req.user = result.rows[0];
+    req.competition_id = decoded.competition_id;
+    req.slug = decoded.slug;
     next();
   } catch (error) {
     return res.status(401).json({
@@ -56,21 +58,19 @@ const verifyToken = async (req, res, next) => {
 API Route: /set-pick
 =======================================================================================================================================
 Method: POST
-Purpose: Make or update a pick for a round
+Purpose: Make or update a pick for a round (player picks own team, admin can pick for any player)
 =======================================================================================================================================
-Request Payload:
+Request Payload (Player):
 {
-  "fixture_id": 16,
-  "team": "home",
-  "user_id": 456
+  "fixture_id": 24,
+  "team": "home"
 }
 
-OR
-
+Request Payload (Admin setting for another player):
 {
-  "fixture_id": 16,
+  "fixture_id": 24,
   "team": "away",
-  "user_id": 456
+  "user_id": 12
 }
 
 Success Response:
@@ -79,18 +79,18 @@ Success Response:
   "message": "Pick saved successfully",
   "pick": {
     "id": 1,
-    "team": "Arsenal",
-    "fixture_id": 16,
-    "locked": false,
-    "created_at": "2025-08-24T21:00:00Z"
+    "team": "CHE",
+    "fixture_id": 24,
+    "created_at": "2025-08-25T21:00:00Z"
   }
 }
 =======================================================================================================================================
 */
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyPlayerToken, async (req, res) => {
   try {
     const { fixture_id, team, user_id } = req.body;
     const authenticated_user_id = req.user.id;
+    const target_user_id = user_id || authenticated_user_id; // Default to own pick if no user_id provided
 
     // Basic validation
     if (!fixture_id || !Number.isInteger(fixture_id)) {
@@ -104,13 +104,6 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(400).json({
         return_code: "VALIDATION_ERROR",
         message: "Team must be 'home' or 'away'"
-      });
-    }
-
-    if (!user_id || !Number.isInteger(user_id)) {
-      return res.status(400).json({
-        return_code: "VALIDATION_ERROR",
-        message: "User ID is required and must be a number"
       });
     }
 
@@ -136,9 +129,11 @@ router.post('/', verifyToken, async (req, res) => {
     const competition_id = fixtureInfo.competition_id;
     const round_id = fixtureInfo.round_id;
 
+    // Check if user is admin (organiser) of this competition
     const isAdmin = fixtureInfo.organiser_id === authenticated_user_id;
-    const isOwnPick = user_id === authenticated_user_id;
+    const isOwnPick = target_user_id === authenticated_user_id;
 
+    // Players can only set their own picks, admins can set any pick
     if (!isAdmin && !isOwnPick) {
       return res.status(403).json({
         return_code: "UNAUTHORIZED",
@@ -146,13 +141,23 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    // Verify target user is part of the competition
+    // For player picks, verify this fixture is in their competition
+    if (!isAdmin && competition_id !== req.competition_id) {
+      return res.status(403).json({
+        return_code: "UNAUTHORIZED",
+        message: "This fixture is not in your competition"
+      });
+    }
+
+    // Convert home/away to team short code
+    const teamShortCode = team === 'home' ? fixtureInfo.home_team_short : fixtureInfo.away_team_short;
+
+    // Verify target user is part of this competition
     const memberCheck = await pool.query(`
       SELECT cu.status
       FROM competition_user cu
       WHERE cu.competition_id = $1 AND cu.user_id = $2
-    `, [competition_id, user_id]);
-    
+    `, [competition_id, target_user_id]);
 
     if (memberCheck.rows.length === 0) {
       return res.status(403).json({
@@ -161,8 +166,7 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-
-    // Allow admins to override time restrictions only (but not round status)
+    // Check if round is locked (admins can override)
     if (!isAdmin) {
       const now = new Date();
       const lockTime = new Date(fixtureInfo.lock_time);
@@ -174,17 +178,13 @@ router.post('/', verifyToken, async (req, res) => {
       }
     }
 
-
-    // Determine team name from fixture info
-    const teamName = team === 'home' ? fixtureInfo.home_team_short : fixtureInfo.away_team_short;
-
     // Check if team was already picked in previous rounds (no team twice rule)
     const previousPickCheck = await pool.query(`
       SELECT p.team
       FROM pick p
       JOIN round r ON p.round_id = r.id
       WHERE r.competition_id = $1 AND p.user_id = $2 AND p.team = $3
-    `, [competition_id, user_id, teamName]);
+    `, [competition_id, target_user_id, teamShortCode]);
 
     if (previousPickCheck.rows.length > 0) {
       return res.status(400).json({
@@ -200,14 +200,14 @@ router.post('/', verifyToken, async (req, res) => {
       ON CONFLICT (round_id, user_id)
       DO UPDATE SET team = $3, fixture_id = $4, created_at = CURRENT_TIMESTAMP
       RETURNING *
-    `, [round_id, user_id, teamName, fixture_id]);
+    `, [round_id, target_user_id, teamShortCode, fixture_id]);
 
     const pick = result.rows[0];
 
     // Log the pick
     const logDetails = isAdmin && !isOwnPick 
-      ? `Admin set pick: ${teamName} for User ${user_id} in Round ${fixtureInfo.round_number}`
-      : `Picked ${teamName} for Round ${fixtureInfo.round_number}`;
+      ? `Admin set pick: ${teamShortCode} for User ${target_user_id} in Round ${fixtureInfo.round_number}`
+      : `Player picked ${teamShortCode} for Round ${fixtureInfo.round_number}`;
       
     await pool.query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)

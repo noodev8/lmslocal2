@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Competition from './pages/Competition';
 import RoundFixtures from './pages/RoundFixtures';
+import PlayerCompetition from './pages/PlayerCompetition';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/competition/:id" element={<Competition />} />
         <Route path="/competition/:competitionId/round/:roundId/fixtures" element={<RoundFixtures />} />
+        <Route path="/play/:slug" element={<PlayerCompetition />} />
       </Routes>
     </Router>
   );

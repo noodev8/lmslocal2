@@ -155,10 +155,45 @@ router.post('/', verifyToken, async (req, res) => {
       return inviteCode;
     };
 
-    // Generate the invite code
-    const inviteCode = await generateInviteCode(organiser_id);
+    // Generate sequential slug starting from 10001
+    const generateSlug = async () => {
+      // Get the highest existing slug number
+      const maxSlugResult = await pool.query(`
+        SELECT slug FROM competition 
+        WHERE slug ~ '^[0-9]+$' 
+        ORDER BY CAST(slug AS INTEGER) DESC 
+        LIMIT 1
+      `);
+      
+      let nextNumber = 10001; // Starting number
+      
+      if (maxSlugResult.rows.length > 0) {
+        const currentMax = parseInt(maxSlugResult.rows[0].slug);
+        nextNumber = currentMax + 1;
+      }
+      
+      // Check if this number is already taken (defensive check)
+      const existsCheck = await pool.query('SELECT id FROM competition WHERE slug = $1', [nextNumber.toString()]);
+      
+      if (existsCheck.rows.length > 0) {
+        // If somehow taken, increment until we find free one
+        while (true) {
+          nextNumber++;
+          const checkAgain = await pool.query('SELECT id FROM competition WHERE slug = $1', [nextNumber.toString()]);
+          if (checkAgain.rows.length === 0) {
+            break;
+          }
+        }
+      }
+      
+      return nextNumber.toString();
+    };
 
-    // Create the competition with invite code
+    // Generate the invite code and slug
+    const inviteCode = await generateInviteCode(organiser_id);
+    const slug = await generateSlug();
+
+    // Create the competition with invite code and slug
     const result = await pool.query(`
       INSERT INTO competition (
         name, 
@@ -169,9 +204,10 @@ router.post('/', verifyToken, async (req, res) => {
         no_team_twice, 
         organiser_id,
         invite_code,
+        slug,
         created_at
       )
-      VALUES ($1, $2, $3, 'LOCKED', $4, $5, $6, $7, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, 'LOCKED', $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
       RETURNING *
     `, [
       name.trim(),
@@ -180,7 +216,8 @@ router.post('/', verifyToken, async (req, res) => {
       lives_per_player || 1,
       no_team_twice !== false, // Default to true
       organiser_id,
-      inviteCode
+      inviteCode,
+      slug
     ]);
 
     const competition = result.rows[0];
