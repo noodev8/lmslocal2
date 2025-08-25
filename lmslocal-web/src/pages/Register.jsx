@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { authAPI } from '../services/api';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -24,22 +25,35 @@ export default function Register() {
     setIsLoading(true);
     setError('');
 
+    // Validation
+    if (!formData.name.trim() || !formData.email.trim() || !formData.password.trim()) {
+      setError('All fields are required');
+      setIsLoading(false);
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       setIsLoading(false);
       return;
     }
 
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // TODO: Replace with actual API call when authentication is ready
-      console.log('Registration attempt:', formData);
+      const result = await authAPI.register(formData.name, formData.email, formData.password);
       
-      // Mock successful registration
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      navigate('/login', { 
-        state: { message: 'Account created successfully! Please sign in.' }
-      });
+      if (result.success) {
+        navigate('/login', { 
+          state: { message: 'Account created successfully! Please check your email to verify your account, then sign in.' }
+        });
+      } else {
+        setError(result.error);
+      }
     } catch (err) {
       setError('Registration failed. Please try again.');
     } finally {
@@ -72,7 +86,7 @@ export default function Register() {
             
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Full name
+                Display name
               </label>
               <div className="mt-1">
                 <input
@@ -83,7 +97,7 @@ export default function Register() {
                   value={formData.name}
                   onChange={handleChange}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your full name"
+                  placeholder="How you want to appear in competitions"
                 />
               </div>
             </div>

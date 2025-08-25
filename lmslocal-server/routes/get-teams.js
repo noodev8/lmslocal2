@@ -1,8 +1,8 @@
 /*
 =======================================================================================================================================
-Create Round Route - Create new round for competition
+Get Teams Route - Get teams for a specific team list
 =======================================================================================================================================
-Purpose: Create new round for a specific competition
+Purpose: Retrieve all active teams for a specific team list
 =======================================================================================================================================
 */
 
@@ -56,116 +56,59 @@ const verifyToken = async (req, res, next) => {
 
 /*
 =======================================================================================================================================
-API Route: /create-round
+API Route: /get-teams
 =======================================================================================================================================
 Method: POST
-Purpose: Create a new round for a competition (organiser only)
+Purpose: Get all active teams for a specific team list
 =======================================================================================================================================
 Request Payload:
 {
-  "competition_id": 123,
-  "lock_time": "2025-08-25T14:00:00Z"
+  "team_list_id": 1
 }
 
 Success Response:
 {
   "return_code": "SUCCESS",
-  "message": "Round created successfully",
-  "round": {
-    "id": 1,
-    "round_number": 1,
-    "lock_time": "2025-08-25T14:00:00Z",
-    "status": "LOCKED",
-    "created_at": "2025-08-23T10:00:00Z"
-  }
+  "teams": [
+    {
+      "id": 1,
+      "name": "Arsenal",
+      "short_name": "ARS"
+    }
+  ]
 }
 =======================================================================================================================================
 */
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { competition_id, lock_time } = req.body;
-    const user_id = req.user.id;
+    const { team_list_id } = req.body;
 
     // Basic validation
-    if (!competition_id || !Number.isInteger(competition_id)) {
+    if (!team_list_id || !Number.isInteger(team_list_id)) {
       return res.status(400).json({
         return_code: "VALIDATION_ERROR",
-        message: "Competition ID is required and must be a number"
+        message: "Team list ID is required and must be a number"
       });
     }
 
-    if (!lock_time) {
-      return res.status(400).json({
-        return_code: "VALIDATION_ERROR",
-        message: "Lock time is required"
-      });
-    }
-
-    // Verify user is the organiser
-    const competitionCheck = await pool.query(
-      'SELECT organiser_id, name FROM competition WHERE id = $1',
-      [competition_id]
-    );
-
-    if (competitionCheck.rows.length === 0) {
-      return res.status(404).json({
-        return_code: "COMPETITION_NOT_FOUND",
-        message: "Competition not found"
-      });
-    }
-
-    if (competitionCheck.rows[0].organiser_id !== user_id) {
-      return res.status(403).json({
-        return_code: "UNAUTHORIZED",
-        message: "Only the competition organiser can create rounds"
-      });
-    }
-
-    // Get the next round number
-    const maxRoundResult = await pool.query(
-      'SELECT COALESCE(MAX(round_number), 0) as max_round FROM round WHERE competition_id = $1',
-      [competition_id]
-    );
-    const nextRoundNumber = maxRoundResult.rows[0].max_round + 1;
-
-    // Create the round
+    // Get teams for this team list
     const result = await pool.query(`
-      INSERT INTO round (
-        competition_id,
-        round_number,
-        lock_time,
-        created_at
-      )
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-      RETURNING *
-    `, [competition_id, nextRoundNumber, lock_time]);
-
-    const round = result.rows[0];
-
-    // Log the creation
-    await pool.query(`
-      INSERT INTO audit_log (competition_id, user_id, action, details)
-      VALUES ($1, $2, 'Round Created', $3)
-    `, [
-      competition_id,
-      user_id,
-      `Created Round ${nextRoundNumber} for "${competitionCheck.rows[0].name}" with lock time ${lock_time}`
-    ]);
+      SELECT 
+        id,
+        name,
+        short_name
+      FROM team
+      WHERE team_list_id = $1 AND is_active = true
+      ORDER BY name ASC
+    `, [team_list_id]);
 
     res.json({
       return_code: "SUCCESS",
-      message: "Round created successfully",
-      round: {
-        id: round.id,
-        round_number: round.round_number,
-        lock_time: round.lock_time,
-        status: round.status,
-        created_at: round.created_at
-      }
+      teams: result.rows
     });
 
   } catch (error) {
-    console.error('Create round error:', error);
+    console.error('Get teams error:', error);
     res.status(500).json({
       return_code: "SERVER_ERROR",
       message: "Internal server error"

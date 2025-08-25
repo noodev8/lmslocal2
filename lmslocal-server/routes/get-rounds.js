@@ -1,8 +1,8 @@
 /*
 =======================================================================================================================================
-Create Round Route - Create new round for competition
+Get Rounds Route - Get rounds for a specific competition
 =======================================================================================================================================
-Purpose: Create new round for a specific competition
+Purpose: Retrieve all rounds for a specific competition with fixture count
 =======================================================================================================================================
 */
 
@@ -56,34 +56,34 @@ const verifyToken = async (req, res, next) => {
 
 /*
 =======================================================================================================================================
-API Route: /create-round
+API Route: /get-rounds
 =======================================================================================================================================
 Method: POST
-Purpose: Create a new round for a competition (organiser only)
+Purpose: Get all rounds for a specific competition
 =======================================================================================================================================
 Request Payload:
 {
-  "competition_id": 123,
-  "lock_time": "2025-08-25T14:00:00Z"
+  "competition_id": 123
 }
 
 Success Response:
 {
   "return_code": "SUCCESS",
-  "message": "Round created successfully",
-  "round": {
-    "id": 1,
-    "round_number": 1,
-    "lock_time": "2025-08-25T14:00:00Z",
-    "status": "LOCKED",
-    "created_at": "2025-08-23T10:00:00Z"
-  }
+  "rounds": [
+    {
+      "id": 1,
+      "round_number": 1,
+      "lock_time": "2025-08-25T15:00:00Z",
+      "status": "LOCKED",
+      "fixture_count": 10
+    }
+  ]
 }
 =======================================================================================================================================
 */
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { competition_id, lock_time } = req.body;
+    const { competition_id } = req.body;
     const user_id = req.user.id;
 
     // Basic validation
@@ -94,78 +94,62 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    if (!lock_time) {
-      return res.status(400).json({
-        return_code: "VALIDATION_ERROR",
-        message: "Lock time is required"
-      });
-    }
-
-    // Verify user is the organiser
-    const competitionCheck = await pool.query(
-      'SELECT organiser_id, name FROM competition WHERE id = $1',
-      [competition_id]
-    );
+    // First check if competition exists
+    const competitionCheck = await pool.query(`
+      SELECT c.id, c.name, c.organiser_id
+      FROM competition c
+      WHERE c.id = $1
+    `, [competition_id]);
 
     if (competitionCheck.rows.length === 0) {
       return res.status(404).json({
-        return_code: "COMPETITION_NOT_FOUND",
+        return_code: "NOT_FOUND",
         message: "Competition not found"
       });
     }
 
-    if (competitionCheck.rows[0].organiser_id !== user_id) {
-      return res.status(403).json({
-        return_code: "UNAUTHORIZED",
-        message: "Only the competition organiser can create rounds"
-      });
+    const competition = competitionCheck.rows[0];
+
+    // Check if user has access (either organiser or participant)
+    if (competition.organiser_id !== user_id) {
+      const participantCheck = await pool.query(`
+        SELECT user_id FROM competition_user WHERE competition_id = $1 AND user_id = $2
+      `, [competition_id, user_id]);
+
+      if (participantCheck.rows.length === 0) {
+        return res.status(403).json({
+          return_code: "ACCESS_DENIED",
+          message: "You do not have access to this competition"
+        });
+      }
     }
 
-    // Get the next round number
-    const maxRoundResult = await pool.query(
-      'SELECT COALESCE(MAX(round_number), 0) as max_round FROM round WHERE competition_id = $1',
-      [competition_id]
-    );
-    const nextRoundNumber = maxRoundResult.rows[0].max_round + 1;
-
-    // Create the round
+    // Get rounds with fixture count
     const result = await pool.query(`
-      INSERT INTO round (
-        competition_id,
-        round_number,
-        lock_time,
-        created_at
-      )
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-      RETURNING *
-    `, [competition_id, nextRoundNumber, lock_time]);
-
-    const round = result.rows[0];
-
-    // Log the creation
-    await pool.query(`
-      INSERT INTO audit_log (competition_id, user_id, action, details)
-      VALUES ($1, $2, 'Round Created', $3)
-    `, [
-      competition_id,
-      user_id,
-      `Created Round ${nextRoundNumber} for "${competitionCheck.rows[0].name}" with lock time ${lock_time}`
-    ]);
+      SELECT 
+        r.id,
+        r.round_number,
+        r.lock_time,
+        COUNT(f.id) as fixture_count
+      FROM round r
+      LEFT JOIN fixture f ON r.id = f.round_id
+      WHERE r.competition_id = $1
+      GROUP BY r.id, r.round_number, r.lock_time
+      ORDER BY r.round_number DESC
+    `, [competition_id]);
 
     res.json({
       return_code: "SUCCESS",
-      message: "Round created successfully",
-      round: {
-        id: round.id,
-        round_number: round.round_number,
-        lock_time: round.lock_time,
-        status: round.status,
-        created_at: round.created_at
-      }
+      rounds: result.rows.map(row => ({
+        id: row.id,
+        round_number: row.round_number,
+        lock_time: row.lock_time,
+        fixture_count: parseInt(row.fixture_count)
+      }))
     });
 
   } catch (error) {
-    console.error('Create round error:', error);
+    console.error('Get rounds error:', error);
     res.status(500).json({
       return_code: "SERVER_ERROR",
       message: "Internal server error"

@@ -59,6 +59,7 @@ router.post('/', verifyToken, async (req, res) => {
         c.no_team_twice,
         c.invite_code,
         c.created_at,
+        c.team_list_id,
         tl.name as team_list_name,
         COUNT(cu_all.user_id) as player_count,
         c.organiser_id
@@ -67,7 +68,7 @@ router.post('/', verifyToken, async (req, res) => {
       LEFT JOIN competition_user cu_all ON c.id = cu_all.competition_id
       LEFT JOIN competition_user cu_player ON c.id = cu_player.competition_id AND cu_player.user_id = $1
       WHERE (c.organiser_id = $1 OR cu_player.user_id = $1)
-      GROUP BY c.id, c.name, c.description, c.status, c.lives_per_player, c.no_team_twice, c.invite_code, c.created_at, tl.name, c.organiser_id
+      GROUP BY c.id, c.name, c.description, c.status, c.lives_per_player, c.no_team_twice, c.invite_code, c.created_at, c.team_list_id, tl.name, c.organiser_id
       ORDER BY c.created_at DESC
     `, [user_id]);
 
@@ -81,6 +82,7 @@ router.post('/', verifyToken, async (req, res) => {
         lives_per_player: row.lives_per_player,
         no_team_twice: row.no_team_twice,
         invite_code: row.invite_code,
+        team_list_id: row.team_list_id,
         team_list_name: row.team_list_name,
         player_count: parseInt(row.player_count),
         created_at: row.created_at,

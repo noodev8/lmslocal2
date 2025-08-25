@@ -33,7 +33,7 @@ const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.userId]);
+    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.user_id || decoded.userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -116,7 +116,7 @@ router.post('/', verifyToken, async (req, res) => {
     // Get fixture details and verify user is organiser
     const fixtureCheck = await pool.query(`
       SELECT f.id, f.home_team, f.away_team, f.home_team_short, f.away_team_short, f.round_id,
-             r.competition_id, r.round_number, r.status, c.organiser_id, c.name as competition_name
+             r.competition_id, r.round_number, c.organiser_id, c.name as competition_name
       FROM fixture f
       JOIN round r ON f.round_id = r.id
       JOIN competition c ON r.competition_id = c.id
@@ -139,13 +139,6 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    // Check if round is UNLOCKED (cannot set results for unlocked rounds)
-    if (fixture.status === 'UNLOCKED') {
-      return res.status(400).json({
-        return_code: "ROUND_UNLOCKED",
-        message: "Cannot set fixture results for an unlocked round. Lock the round first."
-      });
-    }
 
     // Determine result string for database storage
     let resultString;

@@ -5,7 +5,7 @@
 -- Dumped from database version 16.9 (Ubuntu 16.9-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 17.4
 
--- Started on 2025-08-24 13:44:24
+-- Started on 2025-08-25 10:08:14
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -182,8 +182,7 @@ CREATE TABLE public.competition_user (
     user_id integer NOT NULL,
     status character varying(50) DEFAULT 'active'::character varying NOT NULL,
     lives_remaining integer DEFAULT 1,
-    joined_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    eliminated_at timestamp with time zone
+    joined_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -361,8 +360,7 @@ CREATE TABLE public.pick (
     fixture_id integer,
     outcome character varying(10),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    team character varying(100),
-    locked boolean
+    team character varying(100)
 );
 
 
@@ -403,8 +401,7 @@ CREATE TABLE public.round (
     competition_id integer NOT NULL,
     round_number integer NOT NULL,
     lock_time timestamp with time zone,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    status character varying(50)
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -1269,7 +1266,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENC
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO lmslocal_prod_user;
 
 
--- Completed on 2025-08-24 13:44:25
+-- Completed on 2025-08-25 10:08:16
 
 --
 -- PostgreSQL database dump complete

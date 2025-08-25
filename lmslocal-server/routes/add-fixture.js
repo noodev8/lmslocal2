@@ -33,7 +33,8 @@ const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.userId]);
+    const userId = decoded.user_id || decoded.userId; // Handle both formats
+    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -119,7 +120,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     // Verify user is the organiser and round exists
     const verifyResult = await pool.query(`
-      SELECT c.organiser_id, c.name as competition_name, r.round_number, r.status
+      SELECT c.organiser_id, c.name as competition_name, r.round_number
       FROM competition c
       JOIN round r ON c.id = r.competition_id
       WHERE c.id = $1 AND r.id = $2
@@ -139,13 +140,6 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    // Check if round is UNLOCKED (cannot modify fixtures for unlocked rounds)
-    if (verifyResult.rows[0].status === 'UNLOCKED') {
-      return res.status(400).json({
-        return_code: "ROUND_UNLOCKED",
-        message: "Cannot modify fixtures for an unlocked round. Lock the round first."
-      });
-    }
 
     // Verify team IDs exist and get team details
     const teamVerify = await pool.query(`

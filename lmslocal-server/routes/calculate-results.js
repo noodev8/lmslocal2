@@ -33,7 +33,7 @@ const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.userId]);
+    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.user_id || decoded.userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -92,7 +92,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     // Get round details and verify user is organiser
     const roundResult = await pool.query(`
-      SELECT r.id, r.round_number, r.status, r.competition_id, c.organiser_id, c.name as competition_name
+      SELECT r.id, r.round_number, r.competition_id, c.organiser_id, c.name as competition_name
       FROM round r
       JOIN competition c ON r.competition_id = c.id
       WHERE r.id = $1
@@ -114,13 +114,6 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    // Ensure round is LOCKED before calculating results
-    if (round.status !== 'LOCKED') {
-      return res.status(400).json({
-        return_code: "ROUND_NOT_LOCKED",
-        message: "Round must be locked before calculating results"
-      });
-    }
 
     // Get all picks with available fixture data (only those not already calculated)
     const picksAndResults = await pool.query(`

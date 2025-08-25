@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { authAPI } from '../services/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -7,27 +8,41 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for success message from registration
+  const successMessage = location.state?.message;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
+    // Basic validation
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password');
+      setIsLoading(false);
+      return;
+    }
+
+    // Dev shortcut: "a" + "a" = auto login as your account
+    let loginEmail = email.trim();
+    let loginPassword = password.trim();
+    
+    if (loginEmail === 'a' && loginPassword === 'a') {
+      loginEmail = 'aandreou25@gmail.com';
+      loginPassword = '12345678';
+      console.log('🚀 Dev shortcut activated! Logging in as aandreou25@gmail.com');
+    }
+
     try {
-      // TODO: Replace with actual API call when authentication is ready
-      console.log('Login attempt:', { email, password });
+      const result = await authAPI.login(loginEmail, loginPassword);
       
-      // Mock successful login for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Store mock user data
-      localStorage.setItem('user', JSON.stringify({
-        email,
-        name: 'Demo User',
-        token: 'mock-token-' + Date.now()
-      }));
-      
-      navigate('/dashboard');
+      if (result.success) {
+        navigate('/dashboard');
+      } else {
+        setError(result.error);
+      }
     } catch (err) {
       setError('Login failed. Please try again.');
     } finally {
@@ -52,6 +67,11 @@ export default function Login() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {successMessage && (
+              <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded">
+                {successMessage}
+              </div>
+            )}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
                 {error}
@@ -66,7 +86,7 @@ export default function Login() {
                 <input
                   id="email"
                   name="email"
-                  type="email"
+                  type="text"
                   autoComplete="email"
                   required
                   value={email}

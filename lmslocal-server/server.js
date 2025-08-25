@@ -24,13 +24,20 @@ const verifyEmailRoute = require('./routes/verify-email');
 const resendVerificationRoute = require('./routes/resend-verification');
 const mycompetitionsRoute = require('./routes/mycompetitions');
 const createCompetitionRoute = require('./routes/create-competition');
+const teamListsRoute = require('./routes/team-lists');
+const getTeamsRoute = require('./routes/get-teams');
 const createRoundRoute = require('./routes/create-round');
+const getRoundsRoute = require('./routes/get-rounds');
 const addFixtureRoute = require('./routes/add-fixture');
+const getFixturesRoute = require('./routes/get-fixtures');
+const modifyFixtureRoute = require('./routes/modify-fixture');
 const setFixtureResultRoute = require('./routes/set-fixture-result');
-const lockUnlockRoundRoute = require('./routes/lock-unlock-round');
+// const lockUnlockRoundRoute = require('./routes/lock-unlock-round'); // DISABLED: Round status removed
+const lockUnlockCompetitionRoute = require('./routes/lock-unlock-competition');
 const deleteFixtureRoute = require('./routes/delete-fixture');
 const setPickRoute = require('./routes/set-pick');
 const calculateResultsRoute = require('./routes/calculate-results');
+const joinCompetitionRoute = require('./routes/join-competition');
 
 const app = express();
 const PORT = process.env.PORT || 3015;
@@ -80,11 +87,28 @@ const dbIntensiveLimit = rateLimit({
 });
 
 // CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'http://localhost:3002',
+  'http://localhost:3003'
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.CLIENT_URL === origin) {
+      return callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Body parser middleware
@@ -104,13 +128,20 @@ app.use('/verify-email', verifyEmailRoute);
 app.use('/resend-verification', resendVerificationRoute);
 app.use('/mycompetitions', mycompetitionsRoute);
 app.use('/create-competition', createCompetitionRoute);
+app.use('/team-lists', teamListsRoute);
+app.use('/get-teams', getTeamsRoute);
 app.use('/create-round', createRoundRoute);
+app.use('/get-rounds', getRoundsRoute);
 app.use('/add-fixture', addFixtureRoute);
+app.use('/get-fixtures', getFixturesRoute);
+app.use('/modify-fixture', modifyFixtureRoute);
 app.use('/set-fixture-result', setFixtureResultRoute);
-app.use('/lock-unlock-round', lockUnlockRoundRoute);
+// app.use('/lock-unlock-round', lockUnlockRoundRoute); // DISABLED: Round status removed
+app.use('/lock-unlock-competition', lockUnlockCompetitionRoute);
 app.use('/delete-fixture', deleteFixtureRoute);
 app.use('/set-pick', setPickRoute);
 app.use('/calculate-results', calculateResultsRoute);
+app.use('/join-competition', joinCompetitionRoute);
 
 // Default route for testing
 app.get('/', (req, res) => {

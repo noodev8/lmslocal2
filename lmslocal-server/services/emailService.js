@@ -18,7 +18,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
  */
 const sendVerificationEmail = async (email, token, displayName) => {
   try {
-    const verificationUrl = `${process.env.EMAIL_VERIFICATION_URL}/auth/verify-email?token=${token}`;
+    const verificationUrl = `${process.env.EMAIL_VERIFICATION_URL}/verify-email?token=${token}`;
     
     const htmlContent = `
       <!DOCTYPE html>
@@ -106,7 +106,7 @@ const sendVerificationEmail = async (email, token, displayName) => {
  */
 const sendPasswordResetEmail = async (email, token, displayName) => {
   try {
-    const resetUrl = `${process.env.EMAIL_VERIFICATION_URL}/auth/reset-password?token=${token}`;
+    const resetUrl = `${process.env.EMAIL_VERIFICATION_URL}/reset-password?token=${token}`;
     
     const htmlContent = `
       <!DOCTYPE html>

@@ -1,6 +1,8 @@
 /*
 =======================================================================================================================================
-Lock Unlock Round Route
+Modify Fixture Route - Update fixture details
+=======================================================================================================================================
+Purpose: Update kickoff time and other details for an existing fixture
 =======================================================================================================================================
 */
 
@@ -33,7 +35,8 @@ const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.userId]);
+    const userId = decoded.user_id || decoded.userId; // Handle both formats
+    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -53,128 +56,106 @@ const verifyToken = async (req, res, next) => {
 
 /*
 =======================================================================================================================================
-API Route: /lock-unlock-round
+API Route: /modify-fixture
 =======================================================================================================================================
 Method: POST
-Purpose: Change round status (LOCK/UNLOCK) - Admin action from status flow
+Purpose: Update fixture kickoff time (organiser only)
 =======================================================================================================================================
 Request Payload:
 {
-  "competition_id": 123,
-  "round_id": 1,
-  "status": "LOCKED"
-}
-
-OR
-
-{
-  "competition_id": 123,
-  "round_id": 1,
-  "status": "UNLOCKED"
+  "fixture_id": 123,
+  "kickoff_time": "2025-08-30T15:00:00Z"
 }
 
 Success Response:
 {
   "return_code": "SUCCESS",
-  "message": "Round 1 locked successfully",
-  "round": {
-    "id": 1,
-    "round_number": 1,
-    "status": "LOCKED",
-    "lock_time": "2025-08-25T14:00:00Z"
+  "message": "Fixture updated successfully",
+  "fixture": {
+    "id": 123,
+    "home_team": "Arsenal",
+    "away_team": "Chelsea",
+    "home_team_short": "ARS",
+    "away_team_short": "CHE",
+    "kickoff_time": "2025-08-30T15:00:00Z"
   }
 }
 =======================================================================================================================================
 */
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { competition_id, round_id, status } = req.body;
+    const { fixture_id, kickoff_time } = req.body;
     const user_id = req.user.id;
 
     // Basic validation
-    if (!competition_id || !Number.isInteger(competition_id)) {
+    if (!fixture_id || !Number.isInteger(fixture_id)) {
       return res.status(400).json({
         return_code: "VALIDATION_ERROR",
-        message: "Competition ID is required and must be a number"
+        message: "Fixture ID is required and must be a number"
       });
     }
 
-    if (!round_id || !Number.isInteger(round_id)) {
+    if (!kickoff_time) {
       return res.status(400).json({
         return_code: "VALIDATION_ERROR",
-        message: "Round ID is required and must be a number"
+        message: "Kickoff time is required"
       });
     }
 
-    // Validate status
-    if (!status || !['UNLOCKED', 'LOCKED'].includes(status)) {
-      return res.status(400).json({
-        return_code: "VALIDATION_ERROR",
-        message: "Status must be either UNLOCKED or LOCKED"
-      });
-    }
+    // Verify fixture exists and user is the organiser
+    const verifyResult = await pool.query(`
+      SELECT f.id, f.round_id, c.organiser_id, c.name as competition_name, r.round_number
+      FROM fixture f
+      JOIN round r ON f.round_id = r.id
+      JOIN competition c ON r.competition_id = c.id
+      WHERE f.id = $1
+    `, [fixture_id]);
 
-    // Verify user is the organiser
-    const competitionCheck = await pool.query(
-      'SELECT organiser_id, name FROM competition WHERE id = $1',
-      [competition_id]
-    );
-
-    if (competitionCheck.rows.length === 0) {
+    if (verifyResult.rows.length === 0) {
       return res.status(404).json({
-        return_code: "COMPETITION_NOT_FOUND",
-        message: "Competition not found"
+        return_code: "NOT_FOUND",
+        message: "Fixture not found"
       });
     }
 
-    if (competitionCheck.rows[0].organiser_id !== user_id) {
+    const fixtureData = verifyResult.rows[0];
+
+    if (fixtureData.organiser_id !== user_id) {
       return res.status(403).json({
         return_code: "UNAUTHORIZED",
-        message: "Only the competition organiser can change round status"
+        message: "Only the competition organiser can modify fixtures"
       });
     }
 
-    // Update round status
+
+    // Update the fixture
     const result = await pool.query(`
-      UPDATE round 
-      SET status = $1 
-      WHERE id = $2 AND competition_id = $3
+      UPDATE fixture 
+      SET kickoff_time = $1
+      WHERE id = $2
       RETURNING *
-    `, [status, round_id, competition_id]);
+    `, [kickoff_time, fixture_id]);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        return_code: "ROUND_NOT_FOUND",
-        message: "Round not found"
-      });
-    }
+    const updatedFixture = result.rows[0];
 
-    const round = result.rows[0];
-
-    // Log the action
+    // Log the modification
     await pool.query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)
-      VALUES ($1, $2, 'Round Status Changed', $3)
+      VALUES ($1, $2, 'Fixture Modified', $3)
     `, [
-      competition_id,
+      fixtureData.competition_id,
       user_id,
-      `Changed Round ${round.round_number} status to ${status}`
+      `Modified fixture ${updatedFixture.home_team} vs ${updatedFixture.away_team} kickoff time to ${new Date(kickoff_time).toLocaleString()}`
     ]);
 
     res.json({
       return_code: "SUCCESS",
-      message: `Round ${round.round_number} ${status === 'UNLOCKED' ? 'unlocked' : 'locked'} successfully`,
-      round: {
-        id: round.id,
-        round_number: round.round_number,
-        status: round.status,
-        lock_time: round.lock_time,
-        created_at: round.created_at
-      }
+      message: "Fixture updated successfully",
+      fixture: updatedFixture
     });
 
   } catch (error) {
-    console.error('Change round status error:', error);
+    console.error('Modify fixture error:', error);
     res.status(500).json({
       return_code: "SERVER_ERROR",
       message: "Internal server error"

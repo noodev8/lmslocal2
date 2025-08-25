@@ -1,6 +1,8 @@
 /*
 =======================================================================================================================================
-Delete Fixture Route
+Team Lists Route - Get available team lists
+=======================================================================================================================================
+Purpose: Get list of available team lists for competition creation
 =======================================================================================================================================
 */
 
@@ -32,8 +34,9 @@ const verifyToken = async (req, res, next) => {
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Get user from database
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.user_id || decoded.userId]);
+    // Get user from database  
+    const userId = decoded.user_id || decoded.userId; // Handle both formats
+    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -53,83 +56,56 @@ const verifyToken = async (req, res, next) => {
 
 /*
 =======================================================================================================================================
-API Route: /delete-fixture
+API Route: /team-lists
 =======================================================================================================================================
-Method: POST
-Purpose: Delete a specific fixture
+Method: GET
+Purpose: Get list of available team lists for competition creation
 =======================================================================================================================================
-Request Payload:
-{
-  "fixture_id": 16
-}
-
 Success Response:
 {
   "return_code": "SUCCESS",
-  "message": "Fixture deleted successfully"
+  "team_lists": [
+    {
+      "id": 1,
+      "name": "Premier League 2024/25",
+      "type": "football",
+      "season": "2024/25",
+      "team_count": 20
+    }
+  ]
 }
 =======================================================================================================================================
 */
-router.post('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
-    const { fixture_id } = req.body;
-    const user_id = req.user.id;
-
-    // Basic validation
-    if (!fixture_id || !Number.isInteger(fixture_id)) {
-      return res.status(400).json({
-        return_code: "VALIDATION_ERROR",
-        message: "Fixture ID is required and must be a number"
-      });
-    }
-
-    // Verify user is the organiser and get fixture details
-    const verifyResult = await pool.query(`
-      SELECT c.organiser_id, c.name as competition_name, r.round_number,
-             f.home_team, f.away_team, r.competition_id
-      FROM competition c
-      JOIN round r ON c.id = r.competition_id
-      JOIN fixture f ON r.id = f.round_id
-      WHERE f.id = $1
-    `, [fixture_id]);
-
-    if (verifyResult.rows.length === 0) {
-      return res.status(404).json({
-        return_code: "NOT_FOUND",
-        message: "Fixture not found"
-      });
-    }
-
-    const fixture = verifyResult.rows[0];
-
-    if (fixture.organiser_id !== user_id) {
-      return res.status(403).json({
-        return_code: "UNAUTHORIZED",
-        message: "Only the competition organiser can delete fixtures"
-      });
-    }
-
-
-    // Delete the fixture
-    await pool.query('DELETE FROM fixture WHERE id = $1', [fixture_id]);
-
-    // Log the deletion
-    await pool.query(`
-      INSERT INTO audit_log (competition_id, user_id, action, details)
-      VALUES ($1, $2, 'Fixture Deleted', $3)
-    `, [
-      fixture.competition_id,
-      user_id,
-      `Deleted fixture ${fixture.home_team} vs ${fixture.away_team} from Round ${fixture.round_number}`
-    ]);
+    // Get active team lists with team counts
+    const result = await pool.query(`
+      SELECT 
+        tl.id,
+        tl.name,
+        tl.type,
+        tl.season,
+        COUNT(t.id) as team_count
+      FROM team_list tl
+      LEFT JOIN team t ON t.team_list_id = tl.id AND t.is_active = true
+      WHERE tl.is_active = true
+      GROUP BY tl.id, tl.name, tl.type, tl.season
+      ORDER BY tl.name
+    `);
 
     res.json({
       return_code: "SUCCESS",
-      message: "Fixture deleted successfully"
+      team_lists: result.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        type: row.type,
+        season: row.season,
+        team_count: parseInt(row.team_count)
+      }))
     });
 
   } catch (error) {
-    console.error('Delete fixture error:', error);
+    console.error('Team lists error:', error);
     res.status(500).json({
       return_code: "SERVER_ERROR",
       message: "Internal server error"

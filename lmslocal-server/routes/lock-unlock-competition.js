@@ -1,8 +1,6 @@
 /*
 =======================================================================================================================================
-Create Round Route - Create new round for competition
-=======================================================================================================================================
-Purpose: Create new round for a specific competition
+Lock Unlock Competition Route
 =======================================================================================================================================
 */
 
@@ -35,8 +33,7 @@ const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const userId = decoded.user_id || decoded.userId; // Handle both formats
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
+    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.user_id || decoded.userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -56,34 +53,39 @@ const verifyToken = async (req, res, next) => {
 
 /*
 =======================================================================================================================================
-API Route: /create-round
+API Route: /lock-unlock-competition
 =======================================================================================================================================
 Method: POST
-Purpose: Create a new round for a competition (organiser only)
+Purpose: Change competition status (LOCKED/UNLOCKED) - Admin action for competition management
 =======================================================================================================================================
 Request Payload:
 {
   "competition_id": 123,
-  "lock_time": "2025-08-25T14:00:00Z"
+  "status": "LOCKED"
+}
+
+OR
+
+{
+  "competition_id": 123,
+  "status": "UNLOCKED"
 }
 
 Success Response:
 {
   "return_code": "SUCCESS",
-  "message": "Round created successfully",
-  "round": {
-    "id": 1,
-    "round_number": 1,
-    "lock_time": "2025-08-25T14:00:00Z",
-    "status": "LOCKED",
-    "created_at": "2025-08-23T10:00:00Z"
+  "message": "Competition locked successfully",
+  "competition": {
+    "id": 123,
+    "name": "Premier League Survivor",
+    "status": "LOCKED"
   }
 }
 =======================================================================================================================================
 */
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { competition_id, lock_time } = req.body;
+    const { competition_id, status } = req.body;
     const user_id = req.user.id;
 
     // Basic validation
@@ -94,10 +96,11 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    if (!lock_time) {
+    // Validate status
+    if (!status || !['UNLOCKED', 'LOCKED'].includes(status)) {
       return res.status(400).json({
         return_code: "VALIDATION_ERROR",
-        message: "Lock time is required"
+        message: "Status must be either UNLOCKED or LOCKED"
       });
     }
 
@@ -117,55 +120,49 @@ router.post('/', verifyToken, async (req, res) => {
     if (competitionCheck.rows[0].organiser_id !== user_id) {
       return res.status(403).json({
         return_code: "UNAUTHORIZED",
-        message: "Only the competition organiser can create rounds"
+        message: "Only the competition organiser can change competition status"
       });
     }
 
-    // Get the next round number
-    const maxRoundResult = await pool.query(
-      'SELECT COALESCE(MAX(round_number), 0) as max_round FROM round WHERE competition_id = $1',
-      [competition_id]
-    );
-    const nextRoundNumber = maxRoundResult.rows[0].max_round + 1;
-
-    // Create the round
+    // Update competition status
     const result = await pool.query(`
-      INSERT INTO round (
-        competition_id,
-        round_number,
-        lock_time,
-        created_at
-      )
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      UPDATE competition 
+      SET status = $1 
+      WHERE id = $2
       RETURNING *
-    `, [competition_id, nextRoundNumber, lock_time]);
+    `, [status, competition_id]);
 
-    const round = result.rows[0];
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        return_code: "COMPETITION_NOT_FOUND",
+        message: "Competition not found"
+      });
+    }
 
-    // Log the creation
+    const competition = result.rows[0];
+
+    // Log the action
     await pool.query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)
-      VALUES ($1, $2, 'Round Created', $3)
+      VALUES ($1, $2, 'Competition Status Changed', $3)
     `, [
       competition_id,
       user_id,
-      `Created Round ${nextRoundNumber} for "${competitionCheck.rows[0].name}" with lock time ${lock_time}`
+      `Changed competition "${competition.name}" status to ${status}`
     ]);
 
     res.json({
       return_code: "SUCCESS",
-      message: "Round created successfully",
-      round: {
-        id: round.id,
-        round_number: round.round_number,
-        lock_time: round.lock_time,
-        status: round.status,
-        created_at: round.created_at
+      message: `Competition ${status === 'UNLOCKED' ? 'unlocked' : 'locked'} successfully`,
+      competition: {
+        id: competition.id,
+        name: competition.name,
+        status: competition.status
       }
     });
 
   } catch (error) {
-    console.error('Create round error:', error);
+    console.error('Change competition status error:', error);
     res.status(500).json({
       return_code: "SERVER_ERROR",
       message: "Internal server error"

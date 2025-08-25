@@ -35,7 +35,8 @@ const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.userId]);
+    const userId = decoded.user_id || decoded.userId; // Handle both formats  
+    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -170,7 +171,7 @@ router.post('/', verifyToken, async (req, res) => {
         invite_code,
         created_at
       )
-      VALUES ($1, $2, $3, 'UNLOCKED', $4, $5, $6, $7, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, 'LOCKED', $4, $5, $6, $7, CURRENT_TIMESTAMP)
       RETURNING *
     `, [
       name.trim(),
