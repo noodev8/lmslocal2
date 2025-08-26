@@ -7,18 +7,9 @@ Purpose: Retrieve competitions where user is organiser or participant
 */
 
 const express = require('express');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const verifyToken = require('../middleware/verifyToken');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 
 /*
@@ -49,7 +40,7 @@ router.post('/', verifyToken, async (req, res) => {
   try {
     const user_id = req.user.id;
 
-    const result = await pool.query(`
+    const result = await query(`
       SELECT 
         c.id,
         c.name,

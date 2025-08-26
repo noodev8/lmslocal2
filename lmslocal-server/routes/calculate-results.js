@@ -6,17 +6,8 @@ Calculate Results Route
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
@@ -33,7 +24,7 @@ const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.user_id || decoded.userId]);
+    const result = await query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [decoded.user_id || decoded.userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -91,7 +82,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Get round details and verify user is organiser
-    const roundResult = await pool.query(`
+    const roundResult = await query(`
       SELECT r.id, r.round_number, r.competition_id, c.organiser_id, c.name as competition_name
       FROM round r
       JOIN competition c ON r.competition_id = c.id
@@ -116,7 +107,7 @@ router.post('/', verifyToken, async (req, res) => {
 
 
     // Get all picks with available fixture data (only those not already calculated)
-    const picksAndResults = await pool.query(`
+    const picksAndResults = await query(`
       SELECT p.id as pick_id, p.team, p.fixture_id, p.user_id, p.outcome,
              f.home_team, f.away_team, f.home_team_short, f.away_team_short, f.result,
              COALESCE(u.display_name, 'Unknown User') as display_name
@@ -162,7 +153,7 @@ router.post('/', verifyToken, async (req, res) => {
 
       // Update the pick with the calculated outcome
       if (outcome) {
-        await pool.query(`
+        await query(`
           UPDATE pick 
           SET outcome = $1
           WHERE id = $2
@@ -172,7 +163,7 @@ router.post('/', verifyToken, async (req, res) => {
         // If player lost, reduce their lives and potentially eliminate them
         if (outcome === 'LOSE') {
           // Get current lives for this user
-          const livesResult = await pool.query(`
+          const livesResult = await query(`
             SELECT lives_remaining, status
             FROM competition_user
             WHERE competition_id = $1 AND user_id = $2
@@ -184,7 +175,7 @@ router.post('/', verifyToken, async (req, res) => {
 
             if (newLives < 0) {
               // Player would go to -1 lives - eliminate them (set to 0 for tidiness)
-              await pool.query(`
+              await query(`
                 UPDATE competition_user
                 SET lives_remaining = 0, status = 'OUT'
                 WHERE competition_id = $1 AND user_id = $2
@@ -192,7 +183,7 @@ router.post('/', verifyToken, async (req, res) => {
               playersEliminated++;
             } else {
               // Player still survives (even at 0 lives)
-              await pool.query(`
+              await query(`
                 UPDATE competition_user
                 SET lives_remaining = $1
                 WHERE competition_id = $2 AND user_id = $3
@@ -204,7 +195,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Log the calculation
-    await pool.query(`
+    await query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)
       VALUES ($1, $2, 'Results Calculated', $3)
     `, [

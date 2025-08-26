@@ -1,0 +1,371 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  TrophyIcon, 
+  PlusIcon, 
+  UserGroupIcon,
+  ClockIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  ArrowRightIcon,
+  Cog6ToothIcon
+} from '@heroicons/react/24/outline';
+import { competitionApi } from '@/lib/api';
+
+interface Competition {
+  id: number;
+  name: string;
+  status: 'LOCKED' | 'UNLOCKED' | 'SETUP';
+  player_count?: number;
+  current_round?: number;
+  total_rounds?: number;
+  organiser_id: number;
+  created_at: string;
+  needs_pick?: boolean;
+  my_pick?: string;
+  is_organiser?: boolean;
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [organizedCompetitions, setOrganizedCompetitions] = useState<Competition[]>([]);
+  const [playingCompetitions, setPlayingCompetitions] = useState<Competition[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newCompetitionId, setNewCompetitionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check authentication
+    const token = localStorage.getItem('jwt_token');
+    const userData = localStorage.getItem('user');
+    
+    if (!token || !userData) {
+      router.push('/login');
+      return;
+    }
+
+    const parsedUser = JSON.parse(userData);
+    setUser(parsedUser);
+    
+    // Check if we just created a new competition
+    const newCompId = localStorage.getItem('new_competition_id');
+    if (newCompId) {
+      setNewCompetitionId(newCompId);
+      // Clear it after showing
+      localStorage.removeItem('new_competition_id');
+    }
+    
+    loadCompetitions();
+  }, [router]);
+
+  const loadCompetitions = async () => {
+    try {
+      // Load all competitions (both organized and playing)
+      const response = await competitionApi.getMyCompetitions();
+      if (response.data.return_code === 'SUCCESS') {
+        const competitions = response.data.competitions || [];
+        
+        // Separate competitions by role
+        const organized = competitions.filter(comp => comp.is_organiser);
+        const playing = competitions.filter(comp => !comp.is_organiser);
+        
+        setOrganizedCompetitions(organized);
+        setPlayingCompetitions(playing);
+      }
+
+    } catch (error) {
+      console.error('Failed to load competitions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'UNLOCKED': return 'text-green-600 bg-green-50';
+      case 'LOCKED': return 'text-orange-600 bg-orange-50';
+      case 'SETUP': return 'text-gray-600 bg-gray-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'UNLOCKED': return <CheckCircleIcon className="h-5 w-5" />;
+      case 'LOCKED': return <ClockIcon className="h-5 w-5" />;
+      case 'SETUP': return <ExclamationTriangleIcon className="h-5 w-5" />;
+      default: return <ClockIcon className="h-5 w-5" />;
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('user');
+    router.push('/');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center">
+              <Link href="/" className="flex items-center">
+                <TrophyIcon className="h-8 w-8 text-green-600" />
+                <span className="ml-2 text-xl font-bold text-gray-900">LMSLocal</span>
+              </Link>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">
+                Welcome back, <span className="font-medium text-gray-900">{user?.display_name}</span>
+              </span>
+              <button
+                onClick={handleLogout}
+                className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back, {user?.display_name} 👋
+          </h1>
+          <p className="text-lg text-gray-600">
+            Ready to run some brilliant Last Man Standing competitions?
+          </p>
+        </div>
+        {/* Playing Competitions */}
+        <section className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Competitions I'm Playing In</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Join Competition Card */}
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-dashed border-blue-300 rounded-lg p-6 hover:shadow-md transition-shadow flex flex-col items-center justify-center text-center relative overflow-hidden">
+              {/* Decorative background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute top-4 left-4">🎫</div>
+                <div className="absolute top-8 right-8">🎮</div>
+                <div className="absolute bottom-6 left-8">🏅</div>
+                <div className="absolute bottom-4 right-4">🎊</div>
+              </div>
+              
+              <div className="relative z-10">
+                <div className="bg-blue-100 rounded-full p-3 mb-4 inline-flex">
+                  <UserGroupIcon className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Join the Fun</h3>
+                <p className="text-gray-600 text-sm mb-6">
+                  Got an invite code or link? Jump into an exciting competition!
+                  <span className="block text-blue-700 font-medium mt-1">Ready to compete? 🚀</span>
+                </p>
+                <Link
+                  href="/join"
+                  className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
+                >
+                  <UserGroupIcon className="h-4 w-4 mr-2" />
+                  Join Competition
+                </Link>
+              </div>
+            </div>
+
+            {playingCompetitions.map((competition) => (
+              <div key={competition.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 truncate">{competition.name}</h3>
+                
+                <div className="space-y-2 text-sm text-gray-600 mb-6">
+                  {competition.my_pick ? (
+                    <div className="flex items-center text-green-600">
+                      <CheckCircleIcon className="h-4 w-4 mr-2" />
+                      <span>Pick: {competition.my_pick}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-orange-600">
+                      <ExclamationTriangleIcon className="h-4 w-4 mr-2" />
+                      <span>Pick needed</span>
+                    </div>
+                  )}
+                  {competition.current_round && (
+                    <div className="flex items-center">
+                      <ClockIcon className="h-4 w-4 mr-2" />
+                      <span>Round {competition.current_round}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  {competition.needs_pick ? (
+                    <Link
+                      href={`/competition/${competition.id}/pick`}
+                      className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors text-sm"
+                    >
+                      Make Pick
+                      <ArrowRightIcon className="h-4 w-4 ml-1" />
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/competition/${competition.id}/player`}
+                      className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm"
+                    >
+                      View
+                      <ArrowRightIcon className="h-4 w-4 ml-1" />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Organised Competitions */}
+        <section>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">My Organised Competitions</h2>
+              <p className="text-gray-600 text-sm mt-1">
+                Create engaging competitions that bring your customers together
+              </p>
+            </div>
+            {organizedCompetitions.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 lg:max-w-xs">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <TrophyIcon className="h-5 w-5 text-blue-600 mt-0.5" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-900">Running smoothly? 🎯</h3>
+                    <p className="text-xs text-blue-800 mt-1">
+                      Add more rounds to keep the excitement going, or start planning your next competition.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* New Competition Card */}
+            <div className="bg-gradient-to-br from-green-50 to-blue-50 border-2 border-dashed border-green-300 rounded-lg p-6 hover:shadow-md transition-shadow flex flex-col items-center justify-center text-center relative overflow-hidden">
+              {/* Decorative background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute top-4 left-4">⚽</div>
+                <div className="absolute top-8 right-8">🏆</div>
+                <div className="absolute bottom-6 left-8">🎯</div>
+                <div className="absolute bottom-4 right-4">⭐</div>
+              </div>
+              
+              <div className="relative z-10">
+                <div className="bg-green-100 rounded-full p-3 mb-4 inline-flex">
+                  <PlusIcon className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Start New Competition</h3>
+                <p className="text-gray-600 text-sm mb-6">
+                  Get your customers engaged with a thrilling Last Man Standing tournament. 
+                  <span className="block text-green-700 font-medium mt-1">Setup takes just 5 minutes! ⚡</span>
+                </p>
+                <Link
+                  href="/competition/create"
+                  className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors shadow-md hover:shadow-lg"
+                >
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Create Competition
+                </Link>
+              </div>
+            </div>
+
+            {organizedCompetitions.map((competition) => {
+              const isNewCompetition = newCompetitionId && competition.id.toString() === newCompetitionId;
+              return (
+              <div key={competition.id} className={`rounded-lg p-6 hover:shadow-md transition-shadow ${
+                isNewCompetition 
+                  ? 'bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-400 shadow-lg' 
+                  : 'bg-white border border-gray-200'
+              }`}>
+                {isNewCompetition && (
+                  <div className="flex items-center mb-3">
+                    <div className="bg-green-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center">
+                      <span className="animate-pulse mr-1">✨</span>
+                      NEW!
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-start justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 truncate">{competition.name}</h3>
+                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(competition.status)}`}>
+                    {getStatusIcon(competition.status)}
+                    <span className="ml-1 capitalize">{competition.status.toLowerCase()}</span>
+                  </div>
+                </div>
+                
+                {isNewCompetition && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">🎯 Ready to set up your competition?</p>
+                      <p className="text-xs">Add rounds, fixtures, and start inviting players!</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-2 text-sm text-gray-600 mb-6">
+                  <div className="flex items-center">
+                    <UserGroupIcon className="h-4 w-4 mr-2" />
+                    <span>{competition.player_count || 0} players</span>
+                  </div>
+                  {competition.current_round && (
+                    <div className="flex items-center">
+                      <ClockIcon className="h-4 w-4 mr-2" />
+                      <span>Round {competition.current_round}</span>
+                      {competition.total_rounds && <span> of {competition.total_rounds}</span>}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Link
+                    href={`/competition/${competition.id}/manage`}
+                    className={`flex-1 inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      isNewCompetition 
+                        ? 'bg-green-600 text-white hover:bg-green-700 shadow-md' 
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                  >
+                    <Cog6ToothIcon className="h-4 w-4 mr-1" />
+                    Manage
+                  </Link>
+                  <Link
+                    href={`/competition/${competition.id}/player`}
+                    className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
+                  >
+                    View
+                    <ArrowRightIcon className="h-4 w-4 ml-1" />
+                  </Link>
+                </div>
+              </div>
+              );
+            })}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}

@@ -8,17 +8,8 @@ Purpose: Retrieve all fixtures for a specific round
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const db = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
@@ -36,7 +27,7 @@ const verifyToken = async (req, res, next) => {
     
     // Get user from database
     const userId = decoded.user_id || decoded.userId; // Handle both formats
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
+    const result = await db.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -97,7 +88,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Get fixtures for this round - teams are stored as strings in fixture table
-    const result = await pool.query(`
+    const result = await db.query(`
       SELECT 
         f.id,
         f.kickoff_time,

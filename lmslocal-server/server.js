@@ -27,8 +27,11 @@ const createCompetitionRoute = require('./routes/create-competition');
 const teamListsRoute = require('./routes/team-lists');
 const getTeamsRoute = require('./routes/get-teams');
 const createRoundRoute = require('./routes/create-round');
+const updateRoundRoute = require('./routes/update-round');
 const getRoundsRoute = require('./routes/get-rounds');
 const addFixtureRoute = require('./routes/add-fixture');
+const addFixturesBulkRoute = require('./routes/add-fixtures-bulk');
+const replaceFixturesBulkRoute = require('./routes/replace-fixtures-bulk');
 const getFixturesRoute = require('./routes/get-fixtures');
 const modifyFixtureRoute = require('./routes/modify-fixture');
 const setFixtureResultRoute = require('./routes/set-fixture-result');
@@ -44,8 +47,9 @@ const calculateResultsRoute = require('./routes/calculate-results');
 const joinCompetitionRoute = require('./routes/join-competition');
 const playerLoginRoute = require('./routes/player-login');
 const playerLoginGeneralRoute = require('./routes/player-login-general');
-const getUserCompetitionsRoute = require('./routes/get-user-competitions');
 const validateAccessCodeRoute = require('./routes/validate-access-code');
+const registerAndJoinCompetitionRoute = require('./routes/register-and-join-competition');
+const joinByAccessCodeRoute = require('./routes/join-by-access-code');
 
 const app = express();
 const PORT = process.env.PORT || 3015;
@@ -139,8 +143,11 @@ app.use('/create-competition', createCompetitionRoute);
 app.use('/team-lists', teamListsRoute);
 app.use('/get-teams', getTeamsRoute);
 app.use('/create-round', createRoundRoute);
+app.use('/update-round', updateRoundRoute);
 app.use('/get-rounds', getRoundsRoute);
 app.use('/add-fixture', addFixtureRoute);
+app.use('/add-fixtures-bulk', addFixturesBulkRoute);
+app.use('/replace-fixtures-bulk', replaceFixturesBulkRoute);
 app.use('/get-fixtures', getFixturesRoute);
 app.use('/modify-fixture', modifyFixtureRoute);
 app.use('/set-fixture-result', setFixtureResultRoute);
@@ -156,8 +163,9 @@ app.use('/calculate-results', calculateResultsRoute);
 app.use('/join-competition', joinCompetitionRoute);
 app.use('/player-login', playerLoginRoute);
 app.use('/player-login-general', playerLoginGeneralRoute);
-app.use('/get-user-competitions', getUserCompetitionsRoute);
 app.use('/validate-access-code', validateAccessCodeRoute);
+app.use('/register-and-join-competition', registerAndJoinCompetitionRoute);
+app.use('/join-by-access-code', joinByAccessCodeRoute);
 
 // Default route for testing
 app.get('/', (req, res) => {

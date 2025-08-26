@@ -6,17 +6,8 @@ Set Pick Route
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify player JWT token
 const verifyPlayerToken = async (req, res, next) => {
@@ -33,7 +24,7 @@ const verifyPlayerToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const result = await pool.query('SELECT id, email, display_name FROM app_user WHERE id = $1', [decoded.user_id]);
+    const result = await query('SELECT id, email, display_name FROM app_user WHERE id = $1', [decoded.user_id]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -108,7 +99,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
     }
 
     // Get fixture details and related competition/round info
-    const fixtureCheck = await pool.query(`
+    const fixtureCheck = await query(`
       SELECT f.id, f.home_team, f.away_team, f.home_team_short, f.away_team_short, f.round_id,
              r.competition_id, r.lock_time, r.round_number,
              c.organiser_id, c.name as competition_name
@@ -153,7 +144,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
     const teamShortCode = team === 'home' ? fixtureInfo.home_team_short : fixtureInfo.away_team_short;
 
     // Verify target user is part of this competition
-    const memberCheck = await pool.query(`
+    const memberCheck = await query(`
       SELECT cu.status
       FROM competition_user cu
       WHERE cu.competition_id = $1 AND cu.user_id = $2
@@ -179,7 +170,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
     }
 
     // Check if team was already picked in previous rounds (no team twice rule)
-    const previousPickCheck = await pool.query(`
+    const previousPickCheck = await query(`
       SELECT p.team
       FROM pick p
       JOIN round r ON p.round_id = r.id
@@ -194,7 +185,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
     }
 
     // Insert or update the pick
-    const result = await pool.query(`
+    const result = await query(`
       INSERT INTO pick (round_id, user_id, team, fixture_id, created_at)
       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
       ON CONFLICT (round_id, user_id)
@@ -209,7 +200,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
       ? `Admin set pick: ${teamShortCode} for User ${target_user_id} in Round ${fixtureInfo.round_number}`
       : `Player picked ${teamShortCode} for Round ${fixtureInfo.round_number}`;
       
-    await pool.query(`
+    await query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)
       VALUES ($1, $2, 'Pick Made', $3)
     `, [

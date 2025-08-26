@@ -8,17 +8,8 @@ Purpose: Create new competition for authenticated user
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
@@ -36,7 +27,7 @@ const verifyToken = async (req, res, next) => {
     
     // Get user from database
     const userId = decoded.user_id || decoded.userId; // Handle both formats  
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
+    const result = await query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -112,7 +103,7 @@ router.post('/', verifyToken, async (req, res) => {
     const organiser_id = req.user.id;
 
     // Validate team_list exists and is accessible
-    const teamListCheck = await pool.query(
+    const teamListCheck = await query(
       'SELECT id, name FROM team_list WHERE id = $1 AND is_active = true',
       [team_list_id]
     );
@@ -137,7 +128,7 @@ router.post('/', verifyToken, async (req, res) => {
         inviteCode = `${organiserId}.${pin}`;
 
         // Check if this code already exists for this organiser
-        const existingCode = await pool.query(
+        const existingCode = await query(
           'SELECT id FROM competition WHERE organiser_id = $1 AND invite_code = $2',
           [organiserId, inviteCode]
         );
@@ -158,7 +149,7 @@ router.post('/', verifyToken, async (req, res) => {
     // Generate sequential slug starting from 10001
     const generateSlug = async () => {
       // Get the highest existing slug number
-      const maxSlugResult = await pool.query(`
+      const maxSlugResult = await query(`
         SELECT slug FROM competition 
         WHERE slug ~ '^[0-9]+$' 
         ORDER BY CAST(slug AS INTEGER) DESC 
@@ -173,13 +164,13 @@ router.post('/', verifyToken, async (req, res) => {
       }
       
       // Check if this number is already taken (defensive check)
-      const existsCheck = await pool.query('SELECT id FROM competition WHERE slug = $1', [nextNumber.toString()]);
+      const existsCheck = await query('SELECT id FROM competition WHERE slug = $1', [nextNumber.toString()]);
       
       if (existsCheck.rows.length > 0) {
         // If somehow taken, increment until we find free one
         while (true) {
           nextNumber++;
-          const checkAgain = await pool.query('SELECT id FROM competition WHERE slug = $1', [nextNumber.toString()]);
+          const checkAgain = await query('SELECT id FROM competition WHERE slug = $1', [nextNumber.toString()]);
           if (checkAgain.rows.length === 0) {
             break;
           }
@@ -194,7 +185,7 @@ router.post('/', verifyToken, async (req, res) => {
     const slug = await generateSlug();
 
     // Create the competition with invite code and slug
-    const result = await pool.query(`
+    const result = await query(`
       INSERT INTO competition (
         name, 
         description, 
@@ -224,7 +215,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     // If organiser wants to join as a player, add them to competition_user table
     if (organiser_joins_as_player === true) {
-      await pool.query(`
+      await query(`
         INSERT INTO competition_user (
           competition_id,
           user_id,
@@ -242,7 +233,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     // Log the creation
     const participationStatus = organiser_joins_as_player ? 'as organiser and player' : 'as organiser only';
-    await pool.query(`
+    await query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)
       VALUES ($1, $2, 'Competition Created', $3)
     `, [

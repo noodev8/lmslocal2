@@ -36,17 +36,8 @@ Return Codes:
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 router.post('/', async (req, res) => {
   try {
@@ -80,7 +71,7 @@ router.post('/', async (req, res) => {
     }
 
     // Find user by email
-    const userResult = await pool.query(
+    const userResult = await query(
       'SELECT id, email, display_name, password_hash, email_verified FROM app_user WHERE email = $1',
       [loginEmail.toLowerCase()]
     );
@@ -123,7 +114,7 @@ router.post('/', async (req, res) => {
     );
 
     // Update last login timestamp  
-    await pool.query(
+    await query(
       'UPDATE app_user SET last_active_at = NOW() WHERE id = $1',
       [user.id]
     );

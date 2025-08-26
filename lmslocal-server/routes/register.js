@@ -6,19 +6,10 @@ Register Route
 
 const express = require('express');
 const bcrypt = require('bcrypt');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const emailService = require('../services/emailService');
 const tokenUtils = require('../utils/tokenUtils');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 /*
 =======================================================================================================================================
@@ -69,7 +60,7 @@ router.post('/', async (req, res) => {
     }
 
     // Check if email already exists
-    const existingUser = await pool.query('SELECT id FROM app_user WHERE email = $1', [email.toLowerCase()]);
+    const existingUser = await query('SELECT id FROM app_user WHERE email = $1', [email.toLowerCase()]);
     if (existingUser.rows.length > 0) {
       return res.status(400).json({
         return_code: "EMAIL_EXISTS",
@@ -86,7 +77,7 @@ router.post('/', async (req, res) => {
     const tokenExpiry = tokenUtils.getTokenExpiry(24); // 24 hours
 
     // Create user
-    const result = await pool.query(
+    const result = await query(
       'INSERT INTO app_user (display_name, email, password_hash, email_verified, auth_token, auth_token_expires, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id',
       [display_name, email.toLowerCase(), hashedPassword, false, verificationToken, tokenExpiry]
     );
