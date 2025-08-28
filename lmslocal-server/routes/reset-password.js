@@ -6,18 +6,9 @@ Reset Password Route
 
 const express = require('express');
 const bcrypt = require('bcrypt');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const tokenUtils = require('../utils/tokenUtils');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 /*
 =======================================================================================================================================
@@ -59,7 +50,7 @@ router.get('/', async (req, res) => {
     }
 
     // Find user by token (only reset tokens)
-    const result = await pool.query(
+    const result = await query(
       'SELECT id, email, display_name, auth_token_expires FROM app_user WHERE auth_token = $1 AND auth_token LIKE $2',
       [token, 'reset_%']
     );
@@ -348,7 +339,7 @@ router.post('/', async (req, res) => {
     }
 
     // Find user by token (only reset tokens)
-    const result = await pool.query(
+    const result = await query(
       'SELECT id, auth_token_expires FROM app_user WHERE auth_token = $1 AND auth_token LIKE $2',
       [token, 'reset_%']
     );
@@ -375,7 +366,7 @@ router.post('/', async (req, res) => {
     const hashedPassword = await bcrypt.hash(new_password, saltRounds);
 
     // Update password and clear token
-    await pool.query(
+    await query(
       'UPDATE app_user SET password_hash = $1, auth_token = NULL, auth_token_expires = NULL, updated_at = NOW() WHERE id = $2',
       [hashedPassword, user.id]
     );

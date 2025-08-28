@@ -7,17 +7,8 @@ Player Login Route - Simple username/password authentication
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 /*
 =======================================================================================================================================
@@ -83,7 +74,7 @@ router.post('/', async (req, res) => {
     }
 
     // Find user by email and check password
-    const userResult = await pool.query(`
+    const userResult = await query(`
       SELECT id, email, display_name, password_hash
       FROM app_user 
       WHERE email = $1
@@ -108,7 +99,7 @@ router.post('/', async (req, res) => {
     }
 
     // Get competition by slug
-    const competitionResult = await pool.query(`
+    const competitionResult = await query(`
       SELECT id, name, slug, status
       FROM competition
       WHERE slug = $1
@@ -124,7 +115,7 @@ router.post('/', async (req, res) => {
     const competition = competitionResult.rows[0];
 
     // Get player status in this competition
-    const playerStatusResult = await pool.query(`
+    const playerStatusResult = await query(`
       SELECT status, lives_remaining, joined_at
       FROM competition_user
       WHERE competition_id = $1 AND user_id = $2
@@ -143,9 +134,7 @@ router.post('/', async (req, res) => {
     const jwtPayload = { 
       user_id: user.id,
       email: user.email,
-      display_name: user.display_name,
-      competition_id: competition.id,
-      slug: competition.slug
+      display_name: user.display_name
     };
     
     const jwtToken = jwt.sign(
@@ -155,14 +144,14 @@ router.post('/', async (req, res) => {
     );
 
     // Update last active time
-    await pool.query(`
+    await query(`
       UPDATE app_user 
       SET last_active_at = CURRENT_TIMESTAMP
       WHERE id = $1
     `, [user.id]);
 
     // Log successful authentication
-    await pool.query(`
+    await query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)
       VALUES ($1, $2, 'Player Login', $3)
     `, [

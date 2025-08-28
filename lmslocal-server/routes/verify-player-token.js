@@ -143,9 +143,7 @@ router.post('/', async (req, res) => {
     const jwtPayload = { 
       user_id: user.id,
       email: user.email,
-      display_name: user.display_name,
-      competition_id: competition.id,
-      slug: competition.slug
+      display_name: user.display_name
     };
     
     

@@ -8,17 +8,8 @@ Purpose: Retrieve all active teams for a specific team list
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const db = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
@@ -36,7 +27,7 @@ const verifyToken = async (req, res, next) => {
     
     // Get user from database
     const userId = decoded.user_id || decoded.userId; // Handle both formats
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
+    const result = await db.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -83,24 +74,30 @@ router.post('/', verifyToken, async (req, res) => {
   try {
     const { team_list_id } = req.body;
 
-    // Basic validation
-    if (!team_list_id || !Number.isInteger(team_list_id)) {
-      return res.status(400).json({
-        return_code: "VALIDATION_ERROR",
-        message: "Team list ID is required and must be a number"
-      });
+    let result;
+    if (team_list_id && Number.isInteger(team_list_id)) {
+      // Get teams for specific team list
+      result = await db.query(`
+        SELECT 
+          id,
+          name,
+          short_name
+        FROM team
+        WHERE team_list_id = $1 AND is_active = true
+        ORDER BY name ASC
+      `, [team_list_id]);
+    } else {
+      // Get all active teams (for backwards compatibility)
+      result = await db.query(`
+        SELECT 
+          id,
+          name,
+          short_name
+        FROM team
+        WHERE is_active = true
+        ORDER BY name ASC
+      `);
     }
-
-    // Get teams for this team list
-    const result = await pool.query(`
-      SELECT 
-        id,
-        name,
-        short_name
-      FROM team
-      WHERE team_list_id = $1 AND is_active = true
-      ORDER BY name ASC
-    `, [team_list_id]);
 
     res.json({
       return_code: "SUCCESS",

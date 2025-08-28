@@ -36,18 +36,9 @@ Return Codes:
 */
 
 const express = require('express');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const verifyToken = require('../middleware/verifyToken');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 router.post('/', verifyToken, async (req, res) => {
   try {
@@ -72,7 +63,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Find competition by invite code
-    const competitionResult = await pool.query(`
+    const competitionResult = await query(`
       SELECT 
         c.id,
         c.name,
@@ -97,7 +88,7 @@ router.post('/', verifyToken, async (req, res) => {
     const competition = competitionResult.rows[0];
 
     // Check if competition has started by looking for any fixtures with past kickoff times
-    const competitionStartedCheck = await pool.query(`
+    const competitionStartedCheck = await query(`
       SELECT f.kickoff_time
       FROM round r
       JOIN fixture f ON r.id = f.round_id
@@ -114,7 +105,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Check if user is already in this competition
-    const existingParticipation = await pool.query(`
+    const existingParticipation = await query(`
       SELECT id, status FROM competition_user 
       WHERE competition_id = $1 AND user_id = $2
     `, [competition.id, user_id]);
@@ -127,7 +118,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Add user to competition
-    await pool.query(`
+    await query(`
       INSERT INTO competition_user (
         competition_id,
         user_id,
@@ -143,7 +134,7 @@ router.post('/', verifyToken, async (req, res) => {
     ]);
 
     // Log the join action
-    await pool.query(`
+    await query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)
       VALUES ($1, $2, 'Player Joined', $3)
     `, [

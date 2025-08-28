@@ -8,17 +8,8 @@ Purpose: Create new round for a specific competition
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const db = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
@@ -36,7 +27,7 @@ const verifyToken = async (req, res, next) => {
     
     // Get user from database
     const userId = decoded.user_id || decoded.userId; // Handle both formats
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
+    const result = await db.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -102,7 +93,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Verify user is the organiser
-    const competitionCheck = await pool.query(
+    const competitionCheck = await db.query(
       'SELECT organiser_id, name FROM competition WHERE id = $1',
       [competition_id]
     );
@@ -122,28 +113,54 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Get the next round number
-    const maxRoundResult = await pool.query(
+    const maxRoundResult = await db.query(
       'SELECT COALESCE(MAX(round_number), 0) as max_round FROM round WHERE competition_id = $1',
       [competition_id]
     );
     const nextRoundNumber = maxRoundResult.rows[0].max_round + 1;
 
-    // Create the round
-    const result = await pool.query(`
+    // Use INSERT with a subquery to prevent race conditions
+    const result = await db.query(`
       INSERT INTO round (
         competition_id,
         round_number,
         lock_time,
         created_at
       )
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      SELECT $1, $2, $3, CURRENT_TIMESTAMP
+      WHERE NOT EXISTS (
+        SELECT 1 FROM round 
+        WHERE competition_id = $1 AND round_number = $2
+      )
       RETURNING *
     `, [competition_id, nextRoundNumber, lock_time]);
+
+    // If no rows returned, round already exists
+    if (result.rows.length === 0) {
+      // Get the existing round
+      const existingResult = await db.query(
+        'SELECT * FROM round WHERE competition_id = $1 AND round_number = $2',
+        [competition_id, nextRoundNumber]
+      );
+      
+      const existingRound = existingResult.rows[0];
+      return res.json({
+        return_code: "SUCCESS",
+        message: "Round already exists",
+        round: {
+          id: existingRound.id,
+          round_number: existingRound.round_number,
+          lock_time: existingRound.lock_time,
+          status: existingRound.status,
+          created_at: existingRound.created_at
+        }
+      });
+    }
 
     const round = result.rows[0];
 
     // Log the creation
-    await pool.query(`
+    await db.query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)
       VALUES ($1, $2, 'Round Created', $3)
     `, [

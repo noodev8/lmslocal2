@@ -5,19 +5,10 @@ Forgot Password Route
 */
 
 const express = require('express');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const emailService = require('../services/emailService');
 const tokenUtils = require('../utils/tokenUtils');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 /*
 =======================================================================================================================================
@@ -51,7 +42,7 @@ router.post('/', async (req, res) => {
     }
 
     // Get user from database
-    const result = await pool.query(
+    const result = await query(
       'SELECT id, display_name FROM app_user WHERE email = $1',
       [email.toLowerCase()]
     );
@@ -71,7 +62,7 @@ router.post('/', async (req, res) => {
     const tokenExpiry = tokenUtils.getTokenExpiry(1); // 1 hour
 
     // Update user with reset token
-    await pool.query(
+    await query(
       'UPDATE app_user SET auth_token = $1, auth_token_expires = $2, updated_at = NOW() WHERE id = $3',
       [resetToken, tokenExpiry, user.id]
     );

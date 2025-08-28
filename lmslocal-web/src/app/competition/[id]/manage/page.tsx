@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -14,9 +14,12 @@ import {
   Cog6ToothIcon,
   CalendarIcon,
   PlayIcon,
-  PauseIcon
+  PauseIcon,
+  PencilIcon,
+  CheckIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
-import { competitionApi, roundApi, fixtureApi } from '@/lib/api';
+import { competitionApi, roundApi, fixtureApi, teamApi } from '@/lib/api';
 
 interface Competition {
   id: number;
@@ -31,20 +34,22 @@ interface Competition {
 interface Round {
   id: number;
   round_number: number;
-  start_date?: string;
   lock_time?: string;
   status?: string;
   fixture_count?: number;
+  is_current?: boolean;
 }
 
-interface Fixture {
+
+interface Team {
   id: number;
+  name: string;
+  short_name: string;
+}
+
+interface PendingFixture {
   home_team: string;
   away_team: string;
-  kick_off_time: string;
-  home_score?: number;
-  away_score?: number;
-  result_set: boolean;
 }
 
 export default function ManageCompetitionPage() {
@@ -53,11 +58,10 @@ export default function ManageCompetitionPage() {
   const competitionId = params.id as string;
 
   const [competition, setCompetition] = useState<Competition | null>(null);
-  const [rounds, setRounds] = useState<Round[]>([]);
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [selectedRound, setSelectedRound] = useState<Round | null>(null);
+  const [currentRound, setCurrentRound] = useState<Round | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showCreateRound, setShowCreateRound] = useState(false);
+  const [showCreateRoundModal, setShowCreateRoundModal] = useState(false);
+  const [newRoundLockTime, setNewRoundLockTime] = useState('');
 
   const getNextFriday6PM = () => {
     const now = new Date();
@@ -68,16 +72,25 @@ export default function ManageCompetitionPage() {
     nextFriday.setDate(now.getDate() + daysUntilFriday);
     nextFriday.setHours(18, 0, 0, 0); // 6:00 PM
     
-    // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-    return nextFriday.toISOString().slice(0, 16);
+    return nextFriday.toISOString();
   };
 
-  const [newRound, setNewRound] = useState({
-    round_number: 1,
-    start_date: getNextFriday6PM()
-  });
+  // Fixture creation state
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [pendingFixtures, setPendingFixtures] = useState<PendingFixture[]>([]);
+  const [nextSelection, setNextSelection] = useState<'home' | 'away'>('home');
+  const [selectedHomeTeam, setSelectedHomeTeam] = useState<string | null>(null);
+  const [usedTeams, setUsedTeams] = useState<Set<string>>(new Set());
+  const [isEditingCutoff, setIsEditingCutoff] = useState(false);
+  const [newCutoffTime, setNewCutoffTime] = useState('');
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
+    // Prevent double execution from React Strict Mode
+    if (hasInitialized.current) {
+      return;
+    }
+    
     // Check authentication
     const token = localStorage.getItem('jwt_token');
     if (!token) {
@@ -85,13 +98,20 @@ export default function ManageCompetitionPage() {
       return;
     }
 
+    hasInitialized.current = true;
     loadCompetitionData();
+    loadTeams();
   }, [competitionId, router]);
 
   const loadCompetitionData = async () => {
     try {
-      // Load competition details
-      const competitions = await competitionApi.getMyCompetitions();
+      // Load competition details and status in one go
+      const [competitions, status] = await Promise.all([
+        competitionApi.getMyCompetitions(),
+        competitionApi.getStatus(parseInt(competitionId))
+      ]);
+
+      // Check competition access
       if (competitions.data.return_code === 'SUCCESS') {
         const comp = competitions.data.competitions.find(c => c.id.toString() === competitionId);
         if (comp && comp.is_organiser) {
@@ -102,24 +122,22 @@ export default function ManageCompetitionPage() {
         }
       }
 
-      // Load rounds
-      const roundsResponse = await roundApi.getRounds(parseInt(competitionId));
-      if (roundsResponse.data.return_code === 'SUCCESS') {
-        const sortedRounds = roundsResponse.data.rounds.sort((a, b) => a.round_number - b.round_number);
-        setRounds(sortedRounds);
-        
-        // Auto-select latest round or first round
-        if (sortedRounds.length > 0) {
-          const latestRound = sortedRounds[sortedRounds.length - 1];
-          setSelectedRound(latestRound);
-          loadFixtures(latestRound.id);
+      // Handle routing based on status
+      if (status.data.return_code === 'SUCCESS') {
+        if (status.data.should_route_to_results) {
+          // Has fixtures - go to results
+          router.push(`/competition/${competitionId}/results`);
+          return;
         }
         
-        // Set next round number for new round creation
-        setNewRound(prev => ({
-          ...prev,
-          round_number: sortedRounds.length + 1
-        }));
+        if (status.data.current_round) {
+          // Has round but no fixtures - stay here and load fixture creation
+          setCurrentRound(status.data.current_round);
+          loadFixtures(status.data.current_round.id);
+        } else {
+          // No rounds - create first round
+          createFirstRound();
+        }
       }
 
     } catch (error) {
@@ -130,50 +148,218 @@ export default function ManageCompetitionPage() {
   };
 
   const loadFixtures = async (roundId: number) => {
+    if (!roundId) {
+      console.warn('loadFixtures called with invalid roundId:', roundId);
+      return;
+    }
+    
     try {
       const response = await fixtureApi.get(roundId.toString());
       if (response.data.return_code === 'SUCCESS') {
-        setFixtures(response.data.fixtures || []);
+        const existingFixtures = response.data.fixtures || [];
+        
+        // Convert existing fixtures to pending fixtures format
+        const pendingFromExisting = existingFixtures.map((fixture: any) => ({
+          home_team: fixture.home_team_short,
+          away_team: fixture.away_team_short
+        }));
+        
+        setPendingFixtures(pendingFromExisting);
+        
+        // Track used teams
+        const used = new Set<string>();
+        existingFixtures.forEach((fixture: any) => {
+          used.add(fixture.home_team_short);
+          used.add(fixture.away_team_short);
+        });
+        setUsedTeams(used);
+      } else {
+        console.error('Failed to load fixtures:', response.data);
       }
     } catch (error) {
       console.error('Failed to load fixtures:', error);
+      // Reset state on error
+      setPendingFixtures([]);
+      setUsedTeams(new Set());
     }
   };
 
-  const handleCreateRound = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!newRound.start_date) {
-      alert('Please select a start date');
-      return;
-    }
-
+  const createFirstRound = async () => {
     try {
-      const response = await roundApi.create(
-        competitionId,
-        newRound.start_date
-      );
-
+      const response = await roundApi.create(competitionId, getNextFriday6PM());
+      
       if (response.data.return_code === 'SUCCESS') {
-        setShowCreateRound(false);
-        setNewRound({
-          round_number: newRound.round_number + 1,
-          start_date: getNextFriday6PM()
+        // Set the round directly instead of reloading (prevents race condition)
+        setCurrentRound({
+          id: response.data.round.id,
+          round_number: response.data.round.round_number,
+          lock_time: response.data.round.lock_time,
+          status: response.data.round.status || 'UNLOCKED',
+          created_at: response.data.round.created_at
         });
-        // Reload rounds
-        loadCompetitionData();
-      } else {
-        alert('Failed to create round');
+        // Round created successfully
       }
     } catch (error) {
-      console.error('Create round error:', error);
+      console.error('Failed to create first round:', error);
+    }
+  };
+
+  const openCreateRoundModal = () => {
+    if (!currentRound) return;
+    
+    // Set default to next Friday 6 PM in local datetime format
+    const defaultTime = getNextFriday6PM().slice(0, 16); // Remove timezone info for datetime-local input
+    setNewRoundLockTime(defaultTime);
+    setShowCreateRoundModal(true);
+  };
+
+  const handleCreateRound = async () => {
+    if (!newRoundLockTime) return;
+    
+    try {
+      const isoDateTime = new Date(newRoundLockTime).toISOString();
+      const response = await roundApi.create(competitionId, isoDateTime);
+      
+      if (response.data.return_code === 'SUCCESS') {
+        setShowCreateRoundModal(false);
+        setNewRoundLockTime('');
+        loadCompetitionData(); // Reload to show new round
+      } else {
+        alert('Failed to create round: ' + (response.data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Failed to create round:', error);
       alert('Failed to create round');
     }
   };
 
-  const handleRoundSelect = (round: Round) => {
-    setSelectedRound(round);
-    loadFixtures(round.id);
+  const cancelCreateRound = () => {
+    setShowCreateRoundModal(false);
+    setNewRoundLockTime('');
+  };
+
+  const toggleRoundLock = async () => {
+    if (!currentRound) return;
+    
+    // This would call a lock/unlock API endpoint
+    console.log('Toggle lock for round', currentRound.id);
+    // TODO: Implement lock/unlock API call
+  };
+
+  const loadTeams = async () => {
+    try {
+      const response = await teamApi.getTeams();
+      if (response.data.return_code === 'SUCCESS') {
+        setTeams(response.data.teams || []);
+      }
+    } catch (error) {
+      console.error('Failed to load teams:', error);
+    }
+  };
+
+  const handleTeamSelect = (team: Team) => {
+    if (usedTeams.has(team.short_name)) {
+      return; // Team already used
+    }
+
+    if (nextSelection === 'home') {
+      setSelectedHomeTeam(team.short_name);
+      setNextSelection('away');
+      setUsedTeams(prev => new Set([...prev, team.short_name]));
+    } else {
+      // Away team selected - create fixture
+      if (selectedHomeTeam) {
+        const newFixture: PendingFixture = {
+          home_team: selectedHomeTeam,
+          away_team: team.short_name
+        };
+        
+        setPendingFixtures(prev => [...prev, newFixture]);
+        setUsedTeams(prev => new Set([...prev, team.short_name]));
+        
+        // Reset for next fixture
+        setSelectedHomeTeam(null);
+        setNextSelection('home');
+      }
+    }
+  };
+
+  const removePendingFixture = (index: number) => {
+    const fixture = pendingFixtures[index];
+    setPendingFixtures(prev => prev.filter((_, i) => i !== index));
+    
+    // Remove teams from used set
+    setUsedTeams(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(fixture.home_team);
+      newSet.delete(fixture.away_team);
+      return newSet;
+    });
+  };
+
+  const savePendingFixtures = async () => {
+    if (!currentRound || pendingFixtures.length === 0) return;
+
+    try {
+      // Add kickoff_time for API call (backend still expects it)
+      const defaultKickoffTime = currentRound.lock_time || new Date().toISOString();
+      const fixturesWithTime = pendingFixtures.map(fixture => ({
+        ...fixture,
+        kickoff_time: defaultKickoffTime
+      }));
+
+      const response = await fixtureApi.addBulk(currentRound.id.toString(), fixturesWithTime);
+      
+      if (response.data.return_code === 'SUCCESS') {
+        // Go straight to results page after confirming fixtures
+        router.push(`/competition/${competitionId}/results`);
+      } else {
+        alert('Failed to save fixtures: ' + (response.data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Save fixtures error:', error);
+      alert('Failed to save fixtures');
+    }
+  };
+
+  const startEditingCutoff = () => {
+    if (currentRound?.lock_time) {
+      // Convert to datetime-local format
+      const date = new Date(currentRound.lock_time);
+      const localDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, -1);
+      setNewCutoffTime(localDateTime);
+    } else {
+      setNewCutoffTime('');
+    }
+    setIsEditingCutoff(true);
+  };
+
+  const cancelEditingCutoff = () => {
+    setIsEditingCutoff(false);
+    setNewCutoffTime('');
+  };
+
+  const saveCutoffTime = async () => {
+    if (!currentRound || !newCutoffTime) return;
+
+    try {
+      const isoDateTime = new Date(newCutoffTime).toISOString();
+      const response = await roundApi.update(currentRound.id.toString(), isoDateTime);
+      
+      if (response.data.return_code === 'SUCCESS') {
+        // Update local state
+        setCurrentRound(prev => prev ? { ...prev, lock_time: isoDateTime } : null);
+        setIsEditingCutoff(false);
+        alert('Cut-off time updated successfully!');
+      } else {
+        alert('Failed to update cut-off time: ' + (response.data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Update cut-off time error:', error);
+      alert('Failed to update cut-off time');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -196,8 +382,34 @@ export default function ManageCompetitionPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      <div className="min-h-screen bg-gray-50">
+        {/* Show header immediately */}
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center">
+                <Link href="/dashboard" className="flex items-center text-gray-600 hover:text-gray-900 mr-4">
+                  <ArrowLeftIcon className="h-5 w-5 mr-2" />
+                  Dashboard
+                </Link>
+                <TrophyIcon className="h-8 w-8 text-green-600" />
+                <span className="ml-2 text-xl font-bold text-gray-900">Manage Competition</span>
+              </div>
+            </div>
+          </div>
+        </header>
+        
+        {/* Loading content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+                <p className="text-gray-500">Loading competition...</p>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -230,10 +442,6 @@ export default function ManageCompetitionPage() {
               <span className="ml-2 text-xl font-bold text-gray-900">Manage Competition</span>
             </div>
             <div className="flex items-center space-x-4">
-              <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(competition.status)}`}>
-                {getStatusIcon(competition.status)}
-                <span className="ml-1 capitalize">{competition.status.toLowerCase()}</span>
-              </div>
             </div>
           </div>
         </div>
@@ -254,182 +462,207 @@ export default function ManageCompetitionPage() {
                   <UserGroupIcon className="h-4 w-4 mr-1" />
                   <span>{competition.player_count || 0} players</span>
                 </div>
-                {competition.invite_code && (
-                  <div className="flex items-center">
-                    <span className="font-medium">Access Code:</span>
-                    <span className="ml-1 font-mono bg-gray-100 px-2 py-1 rounded">{competition.invite_code}</span>
-                  </div>
-                )}
               </div>
             </div>
             <button
               className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
             >
               <Cog6ToothIcon className="h-4 w-4 mr-2" />
-              Edit Competition
+              Competition Settings
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Rounds Section */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Rounds</h2>
-                <button
-                  onClick={() => setShowCreateRound(true)}
-                  className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm"
-                >
-                  <PlusIcon className="h-4 w-4 mr-1" />
-                  New Round
-                </button>
-              </div>
-
-              {/* Create Round Form */}
-              {showCreateRound && (
-                <form onSubmit={handleCreateRound} className="bg-gray-50 rounded-lg p-4 mb-6">
-                  <h3 className="font-medium text-gray-900 mb-3">Create Round {newRound.round_number}</h3>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Start Date *
-                      </label>
+        {/* Current Round Section */}
+        {currentRound && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-4 mb-2">
+                  <h2 className="text-4xl font-bold text-gray-900">Round {currentRound.round_number}</h2>
+                </div>
+                
+                <div className="text-xl text-gray-600 mb-3">
+                  <ClockIcon className="h-6 w-6 inline mr-2" />
+                  {isEditingCutoff ? (
+                    <div className="inline-flex items-center gap-2">
+                      <span>Choose picks by:</span>
                       <input
                         type="datetime-local"
-                        value={newRound.start_date}
-                        onChange={(e) => setNewRound(prev => ({ ...prev, start_date: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
-                        required
+                        value={newCutoffTime}
+                        onChange={(e) => setNewCutoffTime(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded text-base"
                       />
+                      <button
+                        onClick={saveCutoffTime}
+                        className="p-1 text-green-600 hover:text-green-700"
+                      >
+                        <CheckIcon className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={cancelEditingCutoff}
+                        className="p-1 text-red-600 hover:text-red-700"
+                      >
+                        <XMarkIcon className="h-5 w-5" />
+                      </button>
                     </div>
-                  </div>
-
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      type="submit"
-                      className="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors text-sm"
-                    >
-                      Create Round
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateRound(false)}
-                      className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* Rounds List */}
-              <div className="space-y-2">
-                {rounds.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <CalendarIcon className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">No rounds created yet</p>
-                    <p className="text-xs">Create your first round to get started</p>
-                  </div>
-                ) : (
-                  rounds.map((round) => (
-                    <button
-                      key={round.id}
-                      onClick={() => handleRoundSelect(round)}
-                      className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                        selectedRound?.id === round.id
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-gray-900">Round {round.round_number}</span>
-                        <span className="text-xs text-gray-500">{round.fixture_count || 0} fixtures</span>
-                      </div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        {round.start_date ? new Date(round.start_date).toLocaleDateString() : 'No date set'}
-                      </div>
-                    </button>
-                  ))
-                )}
+                  ) : (
+                    <div className="inline-flex items-center gap-2">
+                      <span>Choose picks by: {currentRound.lock_time ? new Date(currentRound.lock_time).toLocaleString(undefined, { 
+                        weekday: 'long',
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      }) : 'Not set'}</span>
+                      <button
+                        onClick={startEditingCutoff}
+                        className="p-1 text-gray-400 hover:text-gray-600"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
               </div>
-            </div>
-          </div>
-
-          {/* Fixtures Section */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {selectedRound ? `Round ${selectedRound.round_number} Fixtures` : 'Select a Round'}
-                </h2>
-                {selectedRound && (
-                  <button className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm">
-                    <PlusIcon className="h-4 w-4 mr-1" />
-                    Add Fixtures
+              
+              <div className="mt-6 lg:mt-0 flex gap-3 flex-wrap">
+                {pendingFixtures.length > 0 && (
+                  <button
+                    onClick={savePendingFixtures}
+                    className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-lg"
+                  >
+                    Confirm Fixtures
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        )}
 
-              {!selectedRound ? (
-                <div className="text-center py-12 text-gray-500">
-                  <ClockIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>Select a round to view fixtures</p>
-                </div>
-              ) : fixtures.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <ExclamationTriangleIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="mb-2">No fixtures added yet</p>
-                  <p className="text-sm">Add fixtures to get this round started</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {fixtures.map((fixture) => (
-                    <div key={fixture.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-4">
-                            <span className="font-medium">{fixture.home_team}</span>
-                            <span className="text-gray-500">vs</span>
-                            <span className="font-medium">{fixture.away_team}</span>
-                          </div>
-                          <div className="text-sm text-gray-600 mt-1">
-                            {new Date(fixture.kick_off_time).toLocaleString()}
-                          </div>
-                        </div>
+        <div className="grid grid-cols-1 gap-8">
+          {/* Fixtures Management Section */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            {!currentRound ? (
+              <div className="text-center py-12 text-gray-500">
+                <CalendarIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p>Creating your first round...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Team Selection for Adding Fixtures */}
+                <div>
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+
+                    {/* Team Selection Cards - Smaller */}
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 mb-4">
+                      {teams.map((team) => {
+                        const isUsed = usedTeams.has(team.short_name);
+                        const isSelectedHome = selectedHomeTeam === team.short_name;
                         
-                        <div className="flex items-center space-x-4">
-                          {fixture.result_set ? (
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-gray-900">
-                                {fixture.home_score} - {fixture.away_score}
-                              </div>
-                              <div className="text-xs text-green-600 flex items-center">
-                                <CheckCircleIcon className="h-3 w-3 mr-1" />
-                                Result set
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-center">
-                              <div className="text-lg text-gray-400">- - -</div>
-                              <div className="text-xs text-gray-500">No result</div>
-                            </div>
-                          )}
-                          
-                          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                            Edit
+                        return (
+                          <button
+                            key={team.id}
+                            onClick={() => handleTeamSelect(team)}
+                            disabled={isUsed && !isSelectedHome}
+                            className={`p-2 rounded-md border font-medium text-xs transition-all ${
+                              isSelectedHome
+                                ? 'border-gray-400 bg-gray-200 text-gray-800'
+                                : isUsed
+                                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="font-bold text-sm">{team.short_name}</div>
                           </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Pending Fixtures Preview */}
+                    {pendingFixtures.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {pendingFixtures.map((fixture, index) => (
+                            <div key={index} className="flex items-center justify-between bg-white border border-gray-200 rounded px-3 py-2">
+                              <span className="text-sm font-medium">
+                                {fixture.home_team} vs {fixture.away_team}
+                              </span>
+                              <button
+                                onClick={() => removePendingFixture(index)}
+                                className="text-red-500 hover:text-red-700 text-xs"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+
           </div>
         </div>
       </main>
+
+      {/* Create New Round Modal */}
+      {showCreateRoundModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Create New Round</h2>
+              <button
+                onClick={cancelCreateRound}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                This will create Round {currentRound ? currentRound.round_number + 1 : 1} and reset fixtures.
+              </p>
+              
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Make picks by (deadline):
+              </label>
+              <input
+                type="datetime-local"
+                value={newRoundLockTime}
+                onChange={(e) => setNewRoundLockTime(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+                required
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Players must make their picks before this time
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={cancelCreateRound}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateRound}
+                disabled={!newRoundLockTime}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                Create Round
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

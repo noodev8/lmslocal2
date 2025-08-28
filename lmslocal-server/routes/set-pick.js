@@ -9,8 +9,8 @@ const jwt = require('jsonwebtoken');
 const { query } = require('../database');
 const router = express.Router();
 
-// Middleware to verify player JWT token
-const verifyPlayerToken = async (req, res, next) => {
+// Middleware to verify JWT token
+const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -24,7 +24,9 @@ const verifyPlayerToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const result = await query('SELECT id, email, display_name FROM app_user WHERE id = $1', [decoded.user_id]);
+    const userId = decoded.user_id || decoded.userId; // Handle both formats
+    const result = await query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
+    
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -33,8 +35,6 @@ const verifyPlayerToken = async (req, res, next) => {
     }
 
     req.user = result.rows[0];
-    req.competition_id = decoded.competition_id;
-    req.slug = decoded.slug;
     next();
   } catch (error) {
     return res.status(401).json({
@@ -77,7 +77,7 @@ Success Response:
 }
 =======================================================================================================================================
 */
-router.post('/', verifyPlayerToken, async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const { fixture_id, team, user_id } = req.body;
     const authenticated_user_id = req.user.id;
@@ -132,14 +132,6 @@ router.post('/', verifyPlayerToken, async (req, res) => {
       });
     }
 
-    // For player picks, verify this fixture is in their competition
-    if (!isAdmin && competition_id !== req.competition_id) {
-      return res.status(403).json({
-        return_code: "UNAUTHORIZED",
-        message: "This fixture is not in your competition"
-      });
-    }
-
     // Convert home/away to team short code
     const teamShortCode = team === 'home' ? fixtureInfo.home_team_short : fixtureInfo.away_team_short;
 
@@ -149,7 +141,6 @@ router.post('/', verifyPlayerToken, async (req, res) => {
       FROM competition_user cu
       WHERE cu.competition_id = $1 AND cu.user_id = $2
     `, [competition_id, target_user_id]);
-
     if (memberCheck.rows.length === 0) {
       return res.status(403).json({
         return_code: "UNAUTHORIZED",

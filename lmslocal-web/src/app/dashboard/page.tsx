@@ -13,7 +13,8 @@ import {
   ArrowRightIcon,
   Cog6ToothIcon
 } from '@heroicons/react/24/outline';
-import { competitionApi } from '@/lib/api';
+import { competitionApi, userApi } from '@/lib/api';
+import { logout } from '@/lib/auth';
 
 interface Competition {
   id: number;
@@ -33,9 +34,9 @@ export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [organizedCompetitions, setOrganizedCompetitions] = useState<Competition[]>([]);
-  const [playingCompetitions, setPlayingCompetitions] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
   const [newCompetitionId, setNewCompetitionId] = useState<string | null>(null);
+  const [userType, setUserType] = useState<string | null>(null);
 
   useEffect(() => {
     // Check authentication
@@ -58,8 +59,45 @@ export default function DashboardPage() {
       localStorage.removeItem('new_competition_id');
     }
     
-    loadCompetitions();
+    // Check user type for smart routing
+    checkUserTypeAndRoute();
   }, [router]);
+
+  const checkUserTypeAndRoute = async () => {
+    try {
+      const response = await userApi.checkUserType();
+      if (response.data.return_code === 'SUCCESS') {
+        const { user_type, suggested_route, has_organized } = response.data;
+        setUserType(user_type);
+        
+        // Smart routing logic
+        if (user_type === 'player' && !has_organized) {
+          // Pure player - redirect to player dashboard
+          router.push('/play');
+          return;
+        } else if (user_type === 'both' && suggested_route === '/play') {
+          // User participates more than organizes - suggest player dashboard
+          const shouldRedirect = window.confirm(
+            'You participate in more competitions than you organize. Would you like to go to your player dashboard instead?'
+          );
+          if (shouldRedirect) {
+            router.push('/play');
+            return;
+          }
+        }
+        
+        // Stay on admin dashboard for organizers or if user chooses to
+        loadCompetitions();
+      } else {
+        // Fallback to loading competitions if check fails
+        loadCompetitions();
+      }
+    } catch (error) {
+      console.error('Failed to check user type:', error);
+      // Fallback to loading competitions
+      loadCompetitions();
+    }
+  };
 
   const loadCompetitions = async () => {
     try {
@@ -68,12 +106,10 @@ export default function DashboardPage() {
       if (response.data.return_code === 'SUCCESS') {
         const competitions = response.data.competitions || [];
         
-        // Separate competitions by role
+        // Only show competitions where user is organiser
         const organized = competitions.filter(comp => comp.is_organiser);
-        const playing = competitions.filter(comp => !comp.is_organiser);
         
         setOrganizedCompetitions(organized);
-        setPlayingCompetitions(playing);
       }
 
     } catch (error) {
@@ -102,9 +138,29 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('jwt_token');
-    localStorage.removeItem('user');
-    router.push('/');
+    logout(router);
+  };
+
+  const handleManageClick = async (competitionId: number) => {
+    try {
+      const status = await competitionApi.getStatus(competitionId);
+      if (status.data.return_code === 'SUCCESS') {
+        if (status.data.should_route_to_results) {
+          // Has fixtures - go to results
+          router.push(`/competition/${competitionId}/results`);
+        } else {
+          // No fixtures - go to fixture creation
+          router.push(`/competition/${competitionId}/manage`);
+        }
+      } else {
+        // Fallback to manage page
+        router.push(`/competition/${competitionId}/manage`);
+      }
+    } catch (error) {
+      console.error('Failed to get competition status:', error);
+      // Fallback to manage page
+      router.push(`/competition/${competitionId}/manage`);
+    }
   };
 
   if (loading) {
@@ -153,92 +209,9 @@ export default function DashboardPage() {
             Ready to run some brilliant Last Man Standing competitions?
           </p>
         </div>
-        {/* Playing Competitions */}
-        <section className="mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Competitions I'm Playing In</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Join Competition Card */}
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-dashed border-blue-300 rounded-lg p-6 hover:shadow-md transition-shadow flex flex-col items-center justify-center text-center relative overflow-hidden">
-              {/* Decorative background pattern */}
-              <div className="absolute inset-0 opacity-5">
-                <div className="absolute top-4 left-4">🎫</div>
-                <div className="absolute top-8 right-8">🎮</div>
-                <div className="absolute bottom-6 left-8">🏅</div>
-                <div className="absolute bottom-4 right-4">🎊</div>
-              </div>
-              
-              <div className="relative z-10">
-                <div className="bg-blue-100 rounded-full p-3 mb-4 inline-flex">
-                  <UserGroupIcon className="h-8 w-8 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Join the Fun</h3>
-                <p className="text-gray-600 text-sm mb-6">
-                  Got an invite code or link? Jump into an exciting competition!
-                  <span className="block text-blue-700 font-medium mt-1">Ready to compete? 🚀</span>
-                </p>
-                <Link
-                  href="/join"
-                  className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
-                >
-                  <UserGroupIcon className="h-4 w-4 mr-2" />
-                  Join Competition
-                </Link>
-              </div>
-            </div>
-
-            {playingCompetitions.map((competition) => (
-              <div key={competition.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 truncate">{competition.name}</h3>
-                
-                <div className="space-y-2 text-sm text-gray-600 mb-6">
-                  {competition.my_pick ? (
-                    <div className="flex items-center text-green-600">
-                      <CheckCircleIcon className="h-4 w-4 mr-2" />
-                      <span>Pick: {competition.my_pick}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-orange-600">
-                      <ExclamationTriangleIcon className="h-4 w-4 mr-2" />
-                      <span>Pick needed</span>
-                    </div>
-                  )}
-                  {competition.current_round && (
-                    <div className="flex items-center">
-                      <ClockIcon className="h-4 w-4 mr-2" />
-                      <span>Round {competition.current_round}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  {competition.needs_pick ? (
-                    <Link
-                      href={`/competition/${competition.id}/pick`}
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors text-sm"
-                    >
-                      Make Pick
-                      <ArrowRightIcon className="h-4 w-4 ml-1" />
-                    </Link>
-                  ) : (
-                    <Link
-                      href={`/competition/${competition.id}/player`}
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors text-sm"
-                    >
-                      View
-                      <ArrowRightIcon className="h-4 w-4 ml-1" />
-                    </Link>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
+        
         {/* Organised Competitions */}
-        <section>
+        <section className="mb-12">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">My Organised Competitions</h2>
@@ -311,10 +284,12 @@ export default function DashboardPage() {
                 )}
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900 truncate">{competition.name}</h3>
-                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(competition.status)}`}>
-                    {getStatusIcon(competition.status)}
-                    <span className="ml-1 capitalize">{competition.status.toLowerCase()}</span>
-                  </div>
+                  {competition.current_round && (
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-blue-600 bg-blue-50">
+                      <ClockIcon className="h-4 w-4" />
+                      <span className="ml-1">Round {competition.current_round}</span>
+                    </div>
+                  )}
                 </div>
                 
                 {isNewCompetition && (
@@ -331,18 +306,11 @@ export default function DashboardPage() {
                     <UserGroupIcon className="h-4 w-4 mr-2" />
                     <span>{competition.player_count || 0} players</span>
                   </div>
-                  {competition.current_round && (
-                    <div className="flex items-center">
-                      <ClockIcon className="h-4 w-4 mr-2" />
-                      <span>Round {competition.current_round}</span>
-                      {competition.total_rounds && <span> of {competition.total_rounds}</span>}
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex gap-2">
-                  <Link
-                    href={`/competition/${competition.id}/manage`}
+                  <button
+                    onClick={() => handleManageClick(competition.id)}
                     className={`flex-1 inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
                       isNewCompetition 
                         ? 'bg-green-600 text-white hover:bg-green-700 shadow-md' 
@@ -351,7 +319,7 @@ export default function DashboardPage() {
                   >
                     <Cog6ToothIcon className="h-4 w-4 mr-1" />
                     Manage
-                  </Link>
+                  </button>
                   <Link
                     href={`/competition/${competition.id}/player`}
                     className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
@@ -365,6 +333,7 @@ export default function DashboardPage() {
             })}
           </div>
         </section>
+
       </main>
     </div>
   );

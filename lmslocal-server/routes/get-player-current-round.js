@@ -6,17 +6,8 @@ Get Player Current Round Route - Get current round info for player
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const { query } = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify player JWT token
 const verifyPlayerToken = async (req, res, next) => {
@@ -41,7 +32,7 @@ const verifyPlayerToken = async (req, res, next) => {
     }
     
     // Get user from database
-    const result = await pool.query('SELECT id, email, display_name FROM app_user WHERE id = $1', [decoded.user_id]);
+    const result = await query('SELECT id, email, display_name FROM app_user WHERE id = $1', [decoded.user_id]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -112,7 +103,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
     
 
     // Get competition info using ID from JWT
-    const competitionResult = await pool.query(`
+    const competitionResult = await query(`
       SELECT id, name, status, slug
       FROM competition
       WHERE id = $1
@@ -128,7 +119,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
     const competition = competitionResult.rows[0];
 
     // Verify user is in this competition (should be guaranteed by JWT, but double-check)
-    const memberCheck = await pool.query(`
+    const memberCheck = await query(`
       SELECT status, lives_remaining
       FROM competition_user
       WHERE competition_id = $1 AND user_id = $2
@@ -143,7 +134,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
     }
 
     // Get current round (latest round)
-    const roundResult = await pool.query(`
+    const roundResult = await query(`
       SELECT id, round_number, lock_time
       FROM round
       WHERE competition_id = $1
@@ -171,7 +162,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
     const isLocked = now >= lockTime;
 
     // Get fixtures for current round
-    const fixturesResult = await pool.query(`
+    const fixturesResult = await query(`
       SELECT id, home_team, away_team, home_team_short, away_team_short, kickoff_time
       FROM fixture
       WHERE round_id = $1
@@ -179,7 +170,7 @@ router.post('/', verifyPlayerToken, async (req, res) => {
     `, [currentRound.id]);
 
     // Get player's pick for this round
-    const pickResult = await pool.query(`
+    const pickResult = await query(`
       SELECT team, fixture_id, created_at
       FROM pick
       WHERE round_id = $1 AND user_id = $2

@@ -8,17 +8,8 @@ Purpose: Retrieve all rounds for a specific competition with fixture count
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const db = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
@@ -36,7 +27,7 @@ const verifyToken = async (req, res, next) => {
     
     // Get user from database
     const userId = decoded.user_id || decoded.userId; // Handle both formats
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
+    const result = await db.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -95,7 +86,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // First check if competition exists
-    const competitionCheck = await pool.query(`
+    const competitionCheck = await db.query(`
       SELECT c.id, c.name, c.organiser_id
       FROM competition c
       WHERE c.id = $1
@@ -112,7 +103,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     // Check if user has access (either organiser or participant)
     if (competition.organiser_id !== user_id) {
-      const participantCheck = await pool.query(`
+      const participantCheck = await db.query(`
         SELECT user_id FROM competition_user WHERE competition_id = $1 AND user_id = $2
       `, [competition_id, user_id]);
 
@@ -125,7 +116,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Get rounds with fixture count
-    const result = await pool.query(`
+    const result = await db.query(`
       SELECT 
         r.id,
         r.round_number,

@@ -3,41 +3,42 @@
 ## Completed Routes
 ✅ `set-pick.js` - Refactored to use centralized database  
 ✅ `create-competition.js` - Refactored to use centralized database  
-✅ `login.js` - Refactored to use centralized database
+✅ `login.js` - Refactored to use centralized database  
+✅ `register.js` - Already uses centralized database  
+✅ `add-fixtures-bulk.js` - Uses centralized database pool for transactions  
+✅ `calculate-results.js` - Already uses centralized database  
+✅ `create-round.js` - Already uses centralized database  
+✅ `get-fixtures.js` - Already uses centralized database  
+✅ `get-rounds.js` - Already uses centralized database  
+✅ `get-teams.js` - Already uses centralized database  
+✅ `mycompetitions.js` - Already uses centralized database  
+✅ `replace-fixtures-bulk.js` - Already uses centralized database  
+✅ `set-fixture-result.js` - Refactored to use centralized database  
+✅ `team-lists.js` - Already uses centralized database  
+✅ `update-round.js` - Already uses centralized database  
+✅ `join-competition.js` - Refactored to use centralized database  
+✅ `player-login.js` - Refactored to use centralized database  
+✅ `get-player-current-round.js` - Refactored to use centralized database  
+✅ `register-and-join-competition.js` - Refactored to use centralized database
+✅ `forgot-password.js` - Refactored to use centralized database
+✅ `reset-password.js` - Refactored to use centralized database
 
-## Remaining Routes (32 total)
+## Removed Unused Routes
+🗑️ `add-fixture.js` - Deleted (superseded by bulk operations)  
+🗑️ `modify-fixture.js` - Deleted (superseded by bulk operations)  
+🗑️ `delete-fixture.js` - Deleted (superseded by bulk operations)
+
+## Remaining Routes (9 total)
 The following routes still need to be refactored:
 
 ```
-add-fixture.js
-add-fixtures-bulk.js
-calculate-results.js
-create-round.js
-delete-fixture.js
-forgot-password.js
 get-competition-by-slug.js
-get-fixtures.js
-get-player-current-round.js
-get-rounds.js
-get-teams.js
-get-user-competitions.js
 join-by-access-code.js
 join-competition-by-slug.js
-join-competition.js
 lock-unlock-competition.js
-modify-fixture.js
-mycompetitions.js
 player-login-general.js
-player-login.js
-register-and-join-competition.js
-register.js
-replace-fixtures-bulk.js
 resend-verification.js
-reset-password.js
-set-fixture-result.js
-team-lists.js
 update-profile.js
-update-round.js
 validate-access-code.js
 verify-email.js
 verify-player-token.js
@@ -110,7 +111,7 @@ const results = await transaction([
 ```
 
 ## Expected Impact
-- **Before**: 35 routes × 20 connections each = **700 potential connections**
+- **Before**: 32 routes × 20 connections each = **640 potential connections** (3 routes deleted)
 - **After**: 1 shared pool × 20 connections = **20 total connections**
 - **Memory savings**: Significant reduction in pool overhead
 - **Maintenance**: Single point of database configuration

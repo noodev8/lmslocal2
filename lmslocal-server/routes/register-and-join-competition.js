@@ -7,17 +7,8 @@ Register and Join Competition Route - Create account and auto-join competition
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const { query, transaction } = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 /*
 =======================================================================================================================================
@@ -104,6 +95,7 @@ router.post('/', async (req, res) => {
     }
 
     // Start transaction
+    const { pool } = require('../database');
     const client = await pool.connect();
     try {
       await client.query('BEGIN');

@@ -43,17 +43,8 @@ Return Codes:
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const db = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
@@ -71,7 +62,7 @@ const verifyToken = async (req, res, next) => {
     
     // Get user from database
     const userId = decoded.user_id || decoded.userId; // Handle both formats
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
+    const result = await db.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -90,26 +81,21 @@ const verifyToken = async (req, res, next) => {
 };
 
 router.post('/', verifyToken, async (req, res) => {
-  const client = await pool.connect();
+  const client = await db.pool.connect();
   
   try {
-    const { competition_id, round_id, fixtures } = req.body;
+    const { round_id, fixtures } = req.body;
     const user_id = req.user.id;
 
     // Basic validation
-    if (!competition_id || !Number.isInteger(competition_id)) {
-      return res.status(400).json({
-        return_code: "VALIDATION_ERROR",
-        message: "Competition ID is required and must be a number"
-      });
-    }
-
-    if (!round_id || !Number.isInteger(round_id)) {
+    if (!round_id || !Number.isInteger(parseInt(round_id))) {
       return res.status(400).json({
         return_code: "VALIDATION_ERROR",
         message: "Round ID is required and must be a number"
       });
     }
+
+    const roundIdInt = parseInt(round_id);
 
     if (!fixtures || !Array.isArray(fixtures)) {
       return res.status(400).json({
@@ -121,14 +107,14 @@ router.post('/', verifyToken, async (req, res) => {
     // Validate each fixture
     for (let i = 0; i < fixtures.length; i++) {
       const fixture = fixtures[i];
-      if (!fixture.home_team_id || !fixture.away_team_id || !fixture.kickoff_time) {
+      if (!fixture.home_team || !fixture.away_team || !fixture.kickoff_time) {
         return res.status(400).json({
           return_code: "VALIDATION_ERROR",
-          message: `Fixture ${i + 1}: Home team ID, away team ID, and kickoff time are required`
+          message: `Fixture ${i + 1}: Home team, away team, and kickoff time are required`
         });
       }
       
-      if (fixture.home_team_id === fixture.away_team_id) {
+      if (fixture.home_team === fixture.away_team) {
         return res.status(400).json({
           return_code: "VALIDATION_ERROR",
           message: `Fixture ${i + 1}: Home team and away team must be different`
@@ -141,11 +127,11 @@ router.post('/', verifyToken, async (req, res) => {
 
     // Verify user is the organiser and round exists
     const verifyResult = await client.query(`
-      SELECT c.organiser_id, c.name as competition_name, r.round_number
+      SELECT c.organiser_id, c.name as competition_name, r.round_number, r.competition_id
       FROM competition c
       JOIN round r ON c.id = r.competition_id
-      WHERE c.id = $1 AND r.id = $2
-    `, [competition_id, round_id]);
+      WHERE r.id = $1
+    `, [roundIdInt]);
 
     if (verifyResult.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -167,42 +153,42 @@ router.post('/', verifyToken, async (req, res) => {
     const deleteResult = await client.query(`
       DELETE FROM fixture WHERE round_id = $1
       RETURNING id
-    `, [round_id]);
+    `, [roundIdInt]);
     
     const deletedCount = deleteResult.rows.length;
 
     let addedCount = 0;
 
     if (fixtures.length > 0) {
-      // Get all team IDs and validate they exist
-      const allTeamIds = [...new Set(fixtures.flatMap(f => [f.home_team_id, f.away_team_id]))];
+      // Get all team names and validate they exist
+      const allTeamNames = [...new Set(fixtures.flatMap(f => [f.home_team, f.away_team]))];
       const teamResult = await client.query(`
-        SELECT id, name, short_name
+        SELECT name, short_name
         FROM team 
-        WHERE id = ANY($1) AND is_active = true
-      `, [allTeamIds]);
+        WHERE short_name = ANY($1) AND is_active = true
+      `, [allTeamNames]);
 
-      if (teamResult.rows.length !== allTeamIds.length) {
+      if (teamResult.rows.length !== allTeamNames.length) {
         await client.query('ROLLBACK');
         return res.status(400).json({
           return_code: "VALIDATION_ERROR",
-          message: "One or more team IDs are invalid or inactive"
+          message: "One or more team short names are invalid or inactive"
         });
       }
 
       // Create team lookup map
       const teamMap = {};
       teamResult.rows.forEach(team => {
-        teamMap[team.id] = team;
+        teamMap[team.short_name] = team;
       });
 
       // Check for duplicate teams within the new fixtures
       const usedTeams = new Set();
       for (let fixture of fixtures) {
-        const homeTeam = teamMap[fixture.home_team_id];
-        const awayTeam = teamMap[fixture.away_team_id];
+        const homeTeam = teamMap[fixture.home_team];
+        const awayTeam = teamMap[fixture.away_team];
         
-        if (usedTeams.has(homeTeam.name)) {
+        if (usedTeams.has(fixture.home_team)) {
           await client.query('ROLLBACK');
           return res.status(400).json({
             return_code: "VALIDATION_ERROR",
@@ -210,7 +196,7 @@ router.post('/', verifyToken, async (req, res) => {
           });
         }
         
-        if (usedTeams.has(awayTeam.name)) {
+        if (usedTeams.has(fixture.away_team)) {
           await client.query('ROLLBACK');
           return res.status(400).json({
             return_code: "VALIDATION_ERROR",
@@ -218,14 +204,14 @@ router.post('/', verifyToken, async (req, res) => {
           });
         }
         
-        usedTeams.add(homeTeam.name);
-        usedTeams.add(awayTeam.name);
+        usedTeams.add(fixture.home_team);
+        usedTeams.add(fixture.away_team);
       }
 
       // Insert all new fixtures
       for (let fixture of fixtures) {
-        const homeTeam = teamMap[fixture.home_team_id];
-        const awayTeam = teamMap[fixture.away_team_id];
+        const homeTeam = teamMap[fixture.home_team];
+        const awayTeam = teamMap[fixture.away_team];
         
         await client.query(`
           INSERT INTO fixture (
@@ -238,7 +224,7 @@ router.post('/', verifyToken, async (req, res) => {
             created_at
           )
           VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
-        `, [round_id, homeTeam.name, awayTeam.name, homeTeam.short_name, awayTeam.short_name, fixture.kickoff_time]);
+        `, [roundIdInt, homeTeam.name, awayTeam.name, homeTeam.short_name, awayTeam.short_name, fixture.kickoff_time]);
 
         addedCount++;
       }
@@ -249,7 +235,7 @@ router.post('/', verifyToken, async (req, res) => {
       INSERT INTO audit_log (competition_id, user_id, action, details)
       VALUES ($1, $2, 'Fixtures Replaced', $3)
     `, [
-      competition_id,
+      verifyResult.rows[0].competition_id,
       user_id,
       `Replaced fixtures in Round ${verifyResult.rows[0].round_number}: deleted ${deletedCount}, added ${addedCount}`
     ]);

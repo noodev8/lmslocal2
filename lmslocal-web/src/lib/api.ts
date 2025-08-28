@@ -84,6 +84,7 @@ export const playerApi = {
 export const competitionApi = {
   create: (data: CreateCompetitionRequest) => api.post<ApiResponse<{ competition_id: string }>>('/create-competition', data),
   getMyCompetitions: () => api.post<ApiResponse<{ competitions: any[] }>>('/mycompetitions', {}),
+  getStatus: (competition_id: number) => api.post<ApiResponse<{ current_round: any; fixture_count: number; should_route_to_results: boolean }>>('/get-competition-status', { competition_id }),
   getBySlug: (slug: string) => api.post<ApiResponse<{ competition: any }>>('/get-competition-by-slug', { slug }),
   lockUnlock: (competition_id: string, is_locked: boolean) => api.post<ApiResponse<any>>('/lock-unlock-competition', { competition_id, is_locked }),
   validateAccessCode: (access_code: string) => api.post<ApiResponse<{ competition: any }>>('/validate-access-code', { access_code }),
@@ -95,21 +96,19 @@ export const roundApi = {
   create: (competition_id: string, lock_time: string) => 
     api.post<ApiResponse<{ round_id: string }>>('/create-round', { competition_id: parseInt(competition_id), lock_time }),
   getRounds: (competition_id: number) => api.post<ApiResponse<{ rounds: any[] }>>('/get-rounds', { competition_id }),
-  update: (round_id: string, updates: any) => api.post<ApiResponse<any>>('/update-round', { round_id, ...updates }),
+  update: (round_id: string, lock_time: string) => api.post<ApiResponse<any>>('/update-round', { round_id: parseInt(round_id), lock_time }),
   getPlayerCurrentRound: (competition_id: string) => api.post<ApiResponse<{ round: any }>>('/get-player-current-round', { competition_id }),
 };
 
 // Fixture API calls
 export const fixtureApi = {
-  add: (round_id: string, home_team: string, away_team: string, kick_off_time: string) =>
-    api.post<ApiResponse<{ fixture_id: string }>>('/add-fixture', { round_id, home_team, away_team, kick_off_time }),
-  addBulk: (round_id: string, fixtures: any[]) => api.post<ApiResponse<any>>('/add-fixtures-bulk', { round_id, fixtures }),
-  replaceBulk: (round_id: string, fixtures: any[]) => api.post<ApiResponse<any>>('/replace-fixtures-bulk', { round_id, fixtures }),
+  addBulk: (round_id: string, fixtures: { home_team: string; away_team: string; kickoff_time: string }[]) => 
+    api.post<ApiResponse<any>>('/add-fixtures-bulk', { round_id: parseInt(round_id), fixtures }),
+  replaceBulk: (round_id: string, fixtures: { home_team: string; away_team: string; kickoff_time: string }[]) => 
+    api.post<ApiResponse<any>>('/replace-fixtures-bulk', { round_id: parseInt(round_id), fixtures }),
   get: (round_id: string) => api.post<ApiResponse<{ fixtures: any[] }>>('/get-fixtures', { round_id: parseInt(round_id) }),
-  modify: (fixture_id: string, updates: any) => api.post<ApiResponse<any>>('/modify-fixture', { fixture_id, ...updates }),
-  delete: (fixture_id: string) => api.post<ApiResponse<any>>('/delete-fixture', { fixture_id }),
-  setResult: (fixture_id: string, home_score: number, away_score: number, admin_note?: string) =>
-    api.post<ApiResponse<any>>('/set-fixture-result', { fixture_id, home_score, away_score, admin_note }),
+  setResult: (fixture_id: number, result: 'home_win' | 'away_win' | 'draw') =>
+    api.post<ApiResponse<any>>('/set-fixture-result', { fixture_id, result }),
 };
 
 // Team API calls
@@ -127,6 +126,8 @@ export const playerActionApi = {
 // User profile
 export const userApi = {
   updateProfile: (updates: any) => api.post<ApiResponse<any>>('/update-profile', updates),
+  getPlayerDashboard: () => api.post<ApiResponse<{ competitions: any[] }>>('/player-dashboard', {}),
+  checkUserType: () => api.post<ApiResponse<{ user_type: string; suggested_route: string; organized_count: number; participating_count: number; has_organized: boolean; has_participated: boolean }>>('/check-user-type', {}),
 };
 
 export default api;

@@ -53,12 +53,13 @@ router.post('/', verifyToken, async (req, res) => {
         c.created_at,
         c.team_list_id,
         tl.name as team_list_name,
-        COUNT(cu_all.user_id) as player_count,
-        c.organiser_id
+        (SELECT COUNT(*) FROM competition_user cu WHERE cu.competition_id = c.id) as player_count,
+        c.organiser_id,
+        MAX(r.round_number) as current_round
       FROM competition c
       JOIN team_list tl ON c.team_list_id = tl.id
-      LEFT JOIN competition_user cu_all ON c.id = cu_all.competition_id
       LEFT JOIN competition_user cu_player ON c.id = cu_player.competition_id AND cu_player.user_id = $1
+      LEFT JOIN round r ON c.id = r.competition_id
       WHERE (c.organiser_id = $1 OR cu_player.user_id = $1)
       GROUP BY c.id, c.name, c.description, c.status, c.lives_per_player, c.no_team_twice, c.invite_code, c.slug, c.created_at, c.team_list_id, tl.name, c.organiser_id
       ORDER BY c.created_at DESC
@@ -79,6 +80,7 @@ router.post('/', verifyToken, async (req, res) => {
         team_list_name: row.team_list_name,
         player_count: parseInt(row.player_count),
         created_at: row.created_at,
+        current_round: row.current_round,
         is_organiser: row.organiser_id === user_id
       }))
     });

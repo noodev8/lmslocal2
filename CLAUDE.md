@@ -15,6 +15,7 @@ This is a full-stack application with two main components:
 - **Database**: PostgreSQL with connection pooling
 - **Port**: 3015
 - **Authentication**: JWT tokens with bcrypt password hashing
+- **Token Policy**: Keep JWT tokens simple and consistent - only include user identification fields (user_id, email, display_name). Any additional data should be fetched from database when needed.
 - **Email**: Resend service for passwordless authentication
 - **Security**: Helmet, CORS, rate limiting, input validation
 

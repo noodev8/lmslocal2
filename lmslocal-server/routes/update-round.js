@@ -34,17 +34,8 @@ Return Codes:
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
+const db = require('../database');
 const router = express.Router();
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
 // Middleware to verify JWT token
 const verifyToken = async (req, res, next) => {
@@ -62,7 +53,7 @@ const verifyToken = async (req, res, next) => {
     
     // Get user from database
     const userId = decoded.user_id || decoded.userId; // Handle both formats
-    const result = await pool.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
+    const result = await db.query('SELECT id, email, display_name, email_verified FROM app_user WHERE id = $1', [userId]);
     if (result.rows.length === 0) {
       return res.status(401).json({
         return_code: "UNAUTHORIZED",
@@ -101,7 +92,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Verify round exists and user is the organiser
-    const roundCheck = await pool.query(`
+    const roundCheck = await db.query(`
       SELECT r.id, r.round_number, c.organiser_id, c.name as competition_name, c.id as competition_id
       FROM round r
       JOIN competition c ON r.competition_id = c.id
@@ -124,7 +115,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     // Update the round
-    const result = await pool.query(`
+    const result = await db.query(`
       UPDATE round 
       SET lock_time = $2, updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
@@ -134,7 +125,7 @@ router.post('/', verifyToken, async (req, res) => {
     const updatedRound = result.rows[0];
 
     // Log the update
-    await pool.query(`
+    await db.query(`
       INSERT INTO audit_log (competition_id, user_id, action, details)
       VALUES ($1, $2, 'Round Updated', $3)
     `, [
